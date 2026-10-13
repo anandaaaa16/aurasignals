@@ -145,17 +145,28 @@ export const DailyPnlView: React.FC<DailyPnlViewProps> = ({ trades }) => {
       </div>
 
       {/* 2. Daily Cards Breakdown List */}
-      <div className="space-y-2.5">
         <div className="flex items-center justify-between px-1 text-xs font-mono text-slate-400">
           <span>CATATAN TRANSAKSI PER HARI</span>
           <span>BASIS MODAL $500</span>
         </div>
 
-        {dailyRecords.map((record) => (
-          <div
-            key={record.dateStr}
-            className="glass-panel rounded-2xl p-3.5 sm:p-4 border border-teal-500/20 hover:border-teal-500/40 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-          >
+        <div className="space-y-3">
+          {dailyRecords.length === 0 ? (
+          <div className="glass-panel rounded-2xl p-6 border border-teal-500/20 text-center space-y-2 font-mono">
+            <Calendar className="w-8 h-8 text-teal-400 mx-auto animate-pulse" />
+            <div className="text-sm font-bold text-white">
+              Sesi Trading Baru Hari Ini Aktif
+            </div>
+            <p className="text-xs text-slate-400 font-sans max-w-xs mx-auto">
+              Platform telah dimulai fresh hari ini. Rekap PnL harian akan otomatis tercatat transparan begitu transaksi pertama selesai.
+            </p>
+          </div>
+        ) : (
+          dailyRecords.map((record) => (
+            <div
+              key={record.dateStr}
+              className="glass-panel rounded-2xl p-3.5 sm:p-4 border border-teal-500/20 hover:border-teal-500/40 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+            >
             {/* Left: Date & Trade Counts */}
             <div className="flex items-center gap-3">
               <div
@@ -216,8 +227,9 @@ export const DailyPnlView: React.FC<DailyPnlViewProps> = ({ trades }) => {
               </div>
             </div>
           </div>
-        ))}
-      </div>
+        ))
+      )}
+    </div>
     </div>
   );
 };

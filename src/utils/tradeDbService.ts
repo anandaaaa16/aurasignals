@@ -1,8 +1,6 @@
-import { collection, doc, setDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, getDocs, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, testFirestoreConnection } from '../firebase';
-import { ClosedTrade, AiTradeJournalEntry } from '../types';
-import { INITIAL_TRADES } from './initialTrades';
-import { INITIAL_AI_JOURNALS } from './aiTradingAgent';
+import { ClosedTrade, AiTradeJournalEntry, SignalData } from '../types';
 
 export { testFirestoreConnection };
 
@@ -26,17 +24,12 @@ export function subscribeToClosedTrades(
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteTrades: ClosedTrade[] = [];
-          snapshot.forEach((d) => {
-            remoteTrades.push(d.data() as ClosedTrade);
-          });
-          onUpdate(remoteTrades);
-        } else {
-          // If Firestore is still empty, seed initial historical trades
-          seedInitialTradesToFirestore();
-          onUpdate(INITIAL_TRADES);
-        }
+        const remoteTrades: ClosedTrade[] = [];
+        snapshot.forEach((d) => {
+          remoteTrades.push(d.data() as ClosedTrade);
+        });
+        // Real-time sync (empty if fresh start)
+        onUpdate(remoteTrades);
       },
       (error) => {
         handleFirestoreError(error, OperationType.GET, TRADES_COLLECTION);
@@ -50,27 +43,25 @@ export function subscribeToClosedTrades(
   }
 }
 
-// Seed initial trades to Firestore so new devices immediately see rich history
-export async function seedInitialTradesToFirestore() {
+// 2. Clear all trade history in Firestore (Admin fresh start button)
+export async function clearAllTradesInCloud(): Promise<boolean> {
   try {
-    for (const trade of INITIAL_TRADES.slice(0, 8)) {
-      await setDoc(doc(db, TRADES_COLLECTION, trade.id), trade);
+    const tradeDocs = await getDocs(collection(db, TRADES_COLLECTION));
+    for (const d of tradeDocs.docs) {
+      await deleteDoc(d.ref);
     }
-    for (const journal of INITIAL_AI_JOURNALS) {
-      await setDoc(doc(db, JOURNALS_COLLECTION, journal.id), journal);
+    const journalDocs = await getDocs(collection(db, JOURNALS_COLLECTION));
+    for (const d of journalDocs.docs) {
+      await deleteDoc(d.ref);
     }
-    // Initialize default access codes
-    await setDoc(doc(db, CONFIG_COLLECTION, 'system'), {
-      adminPin: '889900',
-      vipCodes: ['VIP777', 'MEMBER8', 'AURA99'],
-      updatedAt: Date.now(),
-    });
+    return true;
   } catch (e) {
-    console.warn('Seeding to Firestore skipped or completed', e);
+    console.error('Error clearing cloud trades', e);
+    return false;
   }
 }
 
-// 2. Persist new closed trade to Firestore (real-time broadcast to all devices!)
+// 3. Persist new closed trade to Firestore (real-time broadcast to all devices!)
 export async function saveClosedTradeToCloud(trade: ClosedTrade) {
   try {
     await setDoc(doc(db, TRADES_COLLECTION, trade.id), trade);
@@ -79,7 +70,7 @@ export async function saveClosedTradeToCloud(trade: ClosedTrade) {
   }
 }
 
-// 3. Persist new AI Journal entry to Firestore
+// 4. Persist new AI Journal entry to Firestore
 export async function saveJournalEntryToCloud(journal: AiTradeJournalEntry) {
   try {
     await setDoc(doc(db, JOURNALS_COLLECTION, journal.id), journal);
@@ -88,7 +79,40 @@ export async function saveJournalEntryToCloud(journal: AiTradeJournalEntry) {
   }
 }
 
-// 4. Verify 6-digit PIN (Admin vs Member VIP)
+// 5. Bot Running State: Start / Stop / Pause Trading AI in Cloud
+export function subscribeToBotControl(onUpdate: (isRunning: boolean) => void) {
+  try {
+    const docRef = doc(db, CONFIG_COLLECTION, 'system');
+    const unsubscribe = onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (typeof data.botRunning === 'boolean') {
+          onUpdate(data.botRunning);
+        }
+      }
+    });
+    return unsubscribe;
+  } catch (err) {
+    return () => {};
+  }
+}
+
+export async function setBotControlInCloud(isRunning: boolean) {
+  try {
+    await setDoc(
+      doc(db, CONFIG_COLLECTION, 'system'),
+      {
+        botRunning: isRunning,
+        updatedAt: Date.now(),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('Failed to update bot status in cloud', err);
+  }
+}
+
+// 6. Verify 6-digit PIN (Admin vs Member VIP)
 export function verifySixDigitCode(code: string): { success: boolean; role: 'ADMIN' | 'MEMBER' | 'GUEST'; message: string } {
   const cleanCode = code.trim();
 
@@ -97,23 +121,23 @@ export function verifySixDigitCode(code: string): { success: boolean; role: 'ADM
     return {
       success: true,
       role: 'ADMIN',
-      message: 'Akses Admin Terverifikasi (Full Control)',
+      message: 'Akses Admin Terverifikasi (Full Control & Bot Management)',
     };
   }
 
-  // VIP Member PINs (e.g. 777888, 123456, VIP777)
+  // VIP Member PINs
   const validMemberCodes = ['777888', '123456', '999888', '555666'];
   if (validMemberCodes.includes(cleanCode)) {
     return {
       success: true,
       role: 'MEMBER',
-      message: 'Akses VIP Member Aktif (Real-Time Signals)',
+      message: 'Akses VIP Member Aktif (Semua Sinyal Unlocked)',
     };
   }
 
   return {
     success: false,
     role: 'GUEST',
-    message: 'Kode 6-Digit Tidak Ditemukan atau Tidak Valid',
+    message: 'Kode 6-Digit Tidak Valid. Hubungi Admin untuk Kode VIP.',
   };
 }

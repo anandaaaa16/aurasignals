@@ -12,15 +12,19 @@ import { DailyPnlView } from './components/DailyPnlView';
 import { BottomNavBar, NavSection } from './components/BottomNavBar';
 import { AiTradeJournalCard } from './components/AiTradeJournalCard';
 import { AccessCodeModal } from './components/AccessCodeModal';
+import { GuestSignalLock } from './components/GuestSignalLock';
+import { AdminControlModal } from './components/AdminControlModal';
 import { generateLiveJournalEntry, INITIAL_AI_JOURNALS } from './utils/aiTradingAgent';
 import {
   subscribeToClosedTrades,
   saveClosedTradeToCloud,
   saveJournalEntryToCloud,
   testFirestoreConnection,
+  subscribeToBotControl,
+  clearAllTradesInCloud,
 } from './utils/tradeDbService';
 import { AiTradeJournalEntry } from './types';
-import { Sparkles, Bell, BellOff, KeyRound, Crown, UserCheck } from 'lucide-react';
+import { Sparkles, Bell, BellOff, KeyRound, Crown, UserCheck, Sliders } from 'lucide-react';
 
 const DEFAULT_BTC: MarketTicker = {
   symbol: 'BTC/USDT',
@@ -72,23 +76,8 @@ export default function App() {
   const prevPriceRef = useRef<number>(83674.0);
   const [priceTickDirection, setPriceTickDirection] = useState<'up' | 'down' | 'neutral'>('neutral');
 
-  // TRADE HISTORY STATE (Persisted in localStorage)
-  const [closedTrades, setClosedTrades] = useState<ClosedTrade[]>(() => {
-    try {
-      const saved = localStorage.getItem('aurasignals_closed_trades');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const hasObsoleteGold = parsed.some((t: ClosedTrade) => t.asset === 'XAU/USD' && t.entryPrice < 3500);
-          const hasToday = parsed.some((t: ClosedTrade) => t.dateStr === '2026-10-11');
-          if (!hasObsoleteGold && hasToday) return parsed;
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to parse saved trades', e);
-    }
-    return INITIAL_TRADES;
-  });
+  // TRADE HISTORY STATE (Fresh Start - Bersih mulai hari ini)
+  const [closedTrades, setClosedTrades] = useState<ClosedTrade[]>([]);
 
   // ACTIVE SIGNALS: Maintained separately for BTC and XAU on H1 timeframe
   const [activeSignals, setActiveSignals] = useState<Record<AssetSymbol, SignalData | null>>({
@@ -102,16 +91,11 @@ export default function App() {
   const [liveConfidence, setLiveConfidence] = useState<number>(88.4);
 
   // AI TRADING AGENT: Historical journal audit trail
-  const [historicalJournals, setHistoricalJournals] = useState<AiTradeJournalEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem('aurasignals_ai_journals');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {}
-    return INITIAL_AI_JOURNALS;
-  });
+  const [historicalJournals, setHistoricalJournals] = useState<AiTradeJournalEntry[]>([]);
+
+  // BOT AI TRADING CONTROL: Running 24/7 vs Paused/Stopped by Admin
+  const [isBotRunning, setIsBotRunning] = useState<boolean>(true);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
 
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -131,15 +115,30 @@ export default function App() {
   });
   const [isAccessModalOpen, setIsAccessModalOpen] = useState<boolean>(false);
 
+  // Clean obsolete mock data from localStorage once on boot
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('aurasignals_closed_trades');
+      if (saved && (saved.includes('trade-init') || saved.includes('trade-hist'))) {
+        localStorage.removeItem('aurasignals_closed_trades');
+        localStorage.removeItem('aurasignals_ai_journals');
+      }
+    } catch (e) {}
+  }, []);
+
   // REAL-TIME FIRESTORE SYNC: Synchronize closed trades across all devices
   useEffect(() => {
     testFirestoreConnection();
-    const unsubscribe = subscribeToClosedTrades((remoteTrades) => {
-      if (remoteTrades && remoteTrades.length > 0) {
-        setClosedTrades(remoteTrades);
-      }
+    const unsubscribeTrades = subscribeToClosedTrades((remoteTrades) => {
+      setClosedTrades(remoteTrades || []);
     });
-    return () => unsubscribe();
+    const unsubscribeBot = subscribeToBotControl((running) => {
+      setIsBotRunning(running);
+    });
+    return () => {
+      unsubscribeTrades();
+      unsubscribeBot();
+    };
   }, []);
 
   // 1-second Gold tick fetcher (supports Cloud, GitHub Pages, & public exchange feeds)
@@ -415,10 +414,17 @@ export default function App() {
           showToast(`🛑 ${asset} HIT SL! (-${Math.abs(pnlPips)} ${isGold ? 'pips' : 'pts'}). Sinyal baru dibuka!`);
         }
 
-        // Open fresh H1 signal for this asset (ONLY if market is open!)
+        // Open fresh H1 signal for this asset (ONLY if market is open AND bot is running!)
         if (asset === 'XAU/USD' && !isGoldMarketOpen().isOpen) {
           activeSignalsRef.current[asset] = null;
           setActiveSignals({ ...activeSignalsRef.current });
+          return;
+        }
+
+        if (!isBotRunning) {
+          activeSignalsRef.current[asset] = null;
+          setActiveSignals({ ...activeSignalsRef.current });
+          showToast(`Trading Bot AI sedang dihentikan oleh Admin.`);
           return;
         }
 
@@ -501,13 +507,43 @@ export default function App() {
         (asset === 'XAU/USD' && existingSig.entryRange.min < 3500) ||
         (ticker && Math.abs(existingSig.entryRange.min - ticker.price) > (asset === 'XAU/USD' ? 50 : 2000));
 
+      if (!isBotRunning) {
+        return;
+      }
+
       if (needsRecalibration) {
         const sig = generateInstantSignal(asset, '1h', basePrice, candles);
         activeSignalsRef.current[asset] = sig;
       }
     });
     setActiveSignals({ ...activeSignalsRef.current });
-  }, [btcTicker, xauTicker]);
+  }, [btcTicker, xauTicker, isBotRunning]);
+
+  // Admin Control Actions
+  const handleForceCloseSignal = (asset: AssetSymbol, hitType: 'HIT_TP' | 'HIT_SL') => {
+    const sig = activeSignalsRef.current[asset];
+    if (!sig) return;
+    const targetPrice = hitType === 'HIT_TP' ? sig.takeProfit[0].price : sig.stopLoss.price;
+    handleIncomingPrice(asset, targetPrice);
+    showToast(`Posisi ${asset} berhasil di-close oleh Admin (${hitType}).`);
+  };
+
+  const handleAddManualSignal = (newSignal: SignalData) => {
+    activeSignalsRef.current[newSignal.asset] = newSignal;
+    setActiveSignals({ ...activeSignalsRef.current });
+    showToast(`Sinyal manual ${newSignal.asset} (${newSignal.signal}) berhasil diterbitkan.`);
+  };
+
+  const handleResetAllHistory = () => {
+    setClosedTrades([]);
+    setHistoricalJournals([]);
+    try {
+      localStorage.removeItem('aurasignals_closed_trades');
+      localStorage.removeItem('aurasignals_ai_journals');
+    } catch (e) {}
+    clearAllTradesInCloud().catch(() => {});
+    showToast('Semua riwayat trading telah dibersihkan (Fresh Start 0 Trade).');
+  };
 
   // Current active signal for selected asset (strictly null if Gold market is closed!)
   const activeSignal = isGoldClosed ? null : (activeSignals[selectedAsset] || activeSignalsRef.current[selectedAsset]);
@@ -547,7 +583,19 @@ export default function App() {
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            {/* Admin Control Panel Button (Only visible if Admin) */}
+            {userRole === 'ADMIN' && (
+              <button
+                onClick={() => setIsAdminModalOpen(true)}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-xl text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-all cursor-pointer shadow-sm shadow-amber-500/20"
+                title="Buka Admin Control Panel"
+              >
+                <Sliders className="w-3 h-3 text-amber-400" />
+                <span>PANEL ADMIN</span>
+              </button>
+            )}
+
             {/* 6-Digit Access PIN Button */}
             <button
               onClick={() => setIsAccessModalOpen(true)}
@@ -591,6 +639,21 @@ export default function App() {
           </div>
         </div>
 
+        {/* Bot Paused Banner (if Admin paused the bot) */}
+        {!isBotRunning && (
+          <div className="p-2.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-mono font-bold flex items-center justify-between animate-pulse">
+            <span>⚠️ TRADING BOT AI DIHENTIKAN OLEH ADMIN</span>
+            {userRole === 'ADMIN' && (
+              <button
+                onClick={() => setIsAdminModalOpen(true)}
+                className="underline hover:text-white cursor-pointer text-[11px]"
+              >
+                Mulai Bot
+              </button>
+            )}
+          </div>
+        )}
+
         {/* TAB 1: Sinyal Live (Header BTC/XAU, Chart Simpel Elegan H1 + 1 TP & SL + Akun Live Owner) */}
         {activeSection === 'chart' && (
           <div className="space-y-3">
@@ -606,13 +669,40 @@ export default function App() {
               isMarketClosed={isGoldClosed}
             />
 
-            {/* Sinyal Aktif Card (Progress Bar, 1 TP, 1 SL - Closed during Weekend!) */}
-            <TpProgressCard
-              signal={activeSignal}
-              currentPrice={currentPrice}
-              liveConfidence={liveConfidence}
-              isMarketClosed={isGoldClosed}
-            />
+            {/* 2. Sinyal Aktif Card & AI Trade Journal Card (BLURRED UNTUK GUEST, UNLOCKED UNTUK VIP & ADMIN) */}
+            {userRole === 'GUEST' ? (
+              <div className="relative">
+                <div className="space-y-3 filter blur-md select-none pointer-events-none opacity-40">
+                  <TpProgressCard
+                    signal={activeSignal}
+                    currentPrice={currentPrice}
+                    liveConfidence={liveConfidence}
+                    isMarketClosed={isGoldClosed}
+                  />
+                  <AiTradeJournalCard
+                    currentJournal={currentJournal}
+                    historicalJournals={historicalJournals}
+                    isMarketClosed={isGoldClosed}
+                  />
+                </div>
+
+                <GuestSignalLock onOpenAccessModal={() => setIsAccessModalOpen(true)} />
+              </div>
+            ) : (
+              <>
+                <TpProgressCard
+                  signal={activeSignal}
+                  currentPrice={currentPrice}
+                  liveConfidence={liveConfidence}
+                  isMarketClosed={isGoldClosed}
+                />
+                <AiTradeJournalCard
+                  currentJournal={currentJournal}
+                  historicalJournals={historicalJournals}
+                  isMarketClosed={isGoldClosed}
+                />
+              </>
+            )}
 
             {/* Akun Live Owner (Live Trading - Modal Awal $500, Clean & Minimal) */}
             <OwnerLivePortfolio
@@ -621,13 +711,6 @@ export default function App() {
               selectedAsset={selectedAsset}
               closedTrades={closedTrades}
               priceTickDirection={priceTickDirection}
-              isMarketClosed={isGoldClosed}
-            />
-
-            {/* AI Trading Agent: 24/7 Autonomous Trade Journal (MindStudio Pattern) */}
-            <AiTradeJournalCard
-              currentJournal={currentJournal}
-              historicalJournals={historicalJournals}
               isMarketClosed={isGoldClosed}
             />
           </div>
@@ -672,6 +755,26 @@ export default function App() {
               : 'Beralih ke mode Guest.'
           );
         }}
+      />
+
+      {/* Admin Control Modal (Start/Stop Bot, Sinyal Manual, Fresh Start) */}
+      <AdminControlModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        isBotRunning={isBotRunning}
+        onToggleBot={(running) => {
+          setIsBotRunning(running);
+          showToast(
+            running
+              ? '▶️ Trading Bot AI Diaktifkan.'
+              : '⏸️ Trading Bot AI Dihentikan oleh Admin.'
+          );
+        }}
+        activeSignals={activeSignals}
+        onForceCloseSignal={handleForceCloseSignal}
+        onAddManualSignal={handleAddManualSignal}
+        onResetAllHistory={handleResetAllHistory}
+        currentPrices={{ btc: btcTicker.price, xau: xauTicker.price }}
       />
     </div>
   );

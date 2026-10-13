@@ -176,7 +176,18 @@ export const SignalHistoryTable: React.FC<SignalHistoryTableProps> = ({ trades }
 
       {/* 2. Simplified Trade Items with Smooth Wave Chart Playback */}
       <div className="space-y-3">
-        {filteredTrades.map((t) => {
+        {filteredTrades.length === 0 ? (
+          <div className="glass-panel rounded-2xl p-6 border border-teal-500/20 text-center space-y-2 font-mono">
+            <Trophy className="w-8 h-8 text-teal-400 mx-auto animate-pulse" />
+            <div className="text-sm font-bold text-white">
+              Riwayat Trading Fresh (Mulai Hari Ini)
+            </div>
+            <p className="text-xs text-slate-400 font-sans max-w-xs mx-auto">
+              Belum ada posisi yang selesai hari ini. Setiap sinyal yang menyentuh TP atau SL akan langsung tercatat otomatis di tabel akurasi ini.
+            </p>
+          </div>
+        ) : (
+          filteredTrades.map((t) => {
           const isWin = t.hitType === 'HIT_TP';
           const isBuy = t.direction === 'BUY';
           const isGold = t.asset === 'XAU/USD';
@@ -249,13 +260,7 @@ export const SignalHistoryTable: React.FC<SignalHistoryTableProps> = ({ trades }
               />
             </div>
           );
-        })}
-
-        {filteredTrades.length === 0 && (
-          <div className="p-8 text-center glass-panel-subtle rounded-2xl text-slate-400 text-xs font-mono">
-            Belum ada riwayat transaksi untuk filter ini.
-          </div>
-        )}
+        }))}
       </div>
     </div>
   );
