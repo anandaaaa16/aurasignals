@@ -151,15 +151,15 @@ export const SignalCard: React.FC<SignalCardProps> = ({
           <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
             <span className="font-semibold text-amber-300 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-amber-400" />
-              Area Masuk (Entry Zone)
+              Entry Range
             </span>
             <span className="font-mono text-slate-400 text-[11px]">
-              Live: ${currentPrice.toFixed(signal.asset === 'XAU/USD' ? 2 : 1)}
+              Live: ${signal.asset === 'XRP/USDT' ? currentPrice.toFixed(4) : currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </span>
           </div>
           <div className="flex items-baseline justify-between font-mono">
             <span className="text-base sm:text-lg font-bold text-white tabular-nums">
-              ${signal.entryRange.min.toLocaleString('en-US')} – ${signal.entryRange.max.toLocaleString('en-US')}
+              ${signal.asset === 'XRP/USDT' ? signal.entryRange.min.toFixed(4) : signal.entryRange.min.toLocaleString('en-US')} – ${signal.asset === 'XRP/USDT' ? signal.entryRange.max.toFixed(4) : signal.entryRange.max.toLocaleString('en-US')}
             </span>
             <span className="text-[11px] text-slate-500">{signal.timeHorizon}</span>
           </div>
@@ -169,7 +169,7 @@ export const SignalCard: React.FC<SignalCardProps> = ({
         <div className="space-y-1.5">
           <div className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
             <Target className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Target Profit (Take Profit)</span>
+            <span>Take Profit Targets</span>
           </div>
 
           <div className="grid grid-cols-3 gap-2">
@@ -178,12 +178,12 @@ export const SignalCard: React.FC<SignalCardProps> = ({
                 key={idx}
                 className="p-2 sm:p-2.5 bg-emerald-950/20 border border-emerald-800/30 rounded-xl text-left"
               >
-                <div className="text-[10px] text-emerald-400/80 font-bold truncate">{tp.target.split(' ')[0]} {tp.target.split(' ')[1]}</div>
+                <div className="text-[10px] text-emerald-400/80 font-bold truncate">{tp.target}</div>
                 <div className="text-xs sm:text-sm font-bold font-mono text-emerald-300 tabular-nums">
-                  ${tp.price.toLocaleString('en-US')}
+                  ${signal.asset === 'XRP/USDT' ? tp.price.toFixed(4) : tp.price.toLocaleString('en-US')}
                 </div>
                 <div className="text-[10px] text-emerald-400/70 font-mono">
-                  +{tp.pipsOrPoints} {signal.asset === 'XAU/USD' ? 'p' : 'pts'}
+                  +{tp.pipsOrPoints} pts
                 </div>
               </div>
             ))}
@@ -195,16 +195,16 @@ export const SignalCard: React.FC<SignalCardProps> = ({
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
             <div>
-              <div className="text-xs font-bold text-rose-300">Batas Rugi (Stop Loss)</div>
+              <div className="text-xs font-bold text-rose-300">Stop Loss Protection</div>
               <div className="text-[10px] text-rose-400/80 font-mono">
-                Risiko: {signal.stopLoss.pipsOrPoints} {signal.asset === 'XAU/USD' ? 'pips' : 'pts'}
+                Risk: {signal.stopLoss.pipsOrPoints} pts
               </div>
             </div>
           </div>
 
           <div className="text-right font-mono">
             <div className="text-sm sm:text-base font-bold text-rose-300 tabular-nums">
-              ${signal.stopLoss.price.toLocaleString('en-US')}
+              ${signal.asset === 'XRP/USDT' ? signal.stopLoss.price.toFixed(4) : signal.stopLoss.price.toLocaleString('en-US')}
             </div>
             <div className="text-[10px] text-slate-400">R:R {signal.stopLoss.riskRewardRatio}</div>
           </div>

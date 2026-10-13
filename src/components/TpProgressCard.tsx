@@ -72,18 +72,30 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
   // Real-Time Floating PnL calculation on every single tick
   const diff = isBuy ? currentPrice - avgEntry : avgEntry - currentPrice;
   const isFloatingProfit = diff >= 0;
-  const isGold = signal.asset === 'XAU/USD';
-  const floatingPips = isGold ? Math.round(diff * 10 * 10) / 10 : Math.round(diff);
+  const floatingPips =
+    signal.asset === 'XRP/USDT'
+      ? Math.round(diff * 10000)
+      : signal.asset === 'ETH/USDT'
+      ? Math.round(diff * 10) / 10
+      : Math.round(diff);
   const floatingPercent = Math.round((diff / avgEntry) * 100 * 100) / 100;
 
-  // Distance in pips to TP and SL
-  const distToTpPips = isGold
-    ? Math.max(0, Math.round(Math.abs(tp1Price - currentPrice) * 10 * 10) / 10)
-    : Math.max(0, Math.round(Math.abs(tp1Price - currentPrice)));
+  // Distance in points/pips to TP and SL
+  const distToTpPips =
+    signal.asset === 'XRP/USDT'
+      ? Math.max(0, Math.round(Math.abs(tp1Price - currentPrice) * 10000))
+      : signal.asset === 'ETH/USDT'
+      ? Math.max(0, Math.round(Math.abs(tp1Price - currentPrice) * 10) / 10)
+      : Math.max(0, Math.round(Math.abs(tp1Price - currentPrice)));
 
-  const distToSlPips = isGold
-    ? Math.max(0, Math.round(Math.abs(currentPrice - slPrice) * 10 * 10) / 10)
-    : Math.max(0, Math.round(Math.abs(currentPrice - slPrice)));
+  const distToSlPips =
+    signal.asset === 'XRP/USDT'
+      ? Math.max(0, Math.round(Math.abs(currentPrice - slPrice) * 10000))
+      : signal.asset === 'ETH/USDT'
+      ? Math.max(0, Math.round(Math.abs(currentPrice - slPrice) * 10) / 10)
+      : Math.max(0, Math.round(Math.abs(currentPrice - slPrice)));
+
+  const pipUnit = signal.asset === 'XRP/USDT' ? 'pips' : 'pts';
 
   return (
     <div className="glass-panel rounded-3xl p-4 sm:p-5 border border-teal-500/25 shadow-2xl space-y-3.5 backdrop-blur-2xl">
@@ -143,7 +155,7 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
             }`}
           >
             {isFloatingProfit ? '+' : ''}
-            {floatingPips} {isGold ? 'pips' : 'pts'}
+            {floatingPips} {pipUnit}
           </div>
           <div
             className={`text-[10px] font-bold ${
@@ -180,11 +192,11 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
         <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-0.5">
           <span className="flex items-center gap-1 text-teal-300">
             <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-            <span>{distToTpPips} {isGold ? 'pips' : 'pts'} to TP</span>
+            <span>{distToTpPips} {pipUnit} to TP</span>
           </span>
           <span className="flex items-center gap-1 text-rose-400/80">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-            <span>{distToSlPips} {isGold ? 'pips' : 'pts'} to SL</span>
+            <span>{distToSlPips} {pipUnit} to SL</span>
           </span>
         </div>
       </div>
@@ -198,7 +210,7 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
               <span>TAKE PROFIT (TP)</span>
             </span>
             <span className="text-[9px] text-emerald-400/80 font-mono">
-              +{signal.takeProfit[0]?.pipsOrPoints} {isGold ? 'pips' : 'pts'}
+              +{signal.takeProfit[0]?.pipsOrPoints} {pipUnit}
             </span>
           </div>
           <div className="text-base font-extrabold font-mono text-emerald-300 tabular-nums">

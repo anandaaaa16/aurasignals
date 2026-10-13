@@ -16,7 +16,11 @@ export const ModernCandleChart: React.FC<ModernCandleChartProps> = ({
 }) => {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
-  const isGold = symbol.includes('XAU');
+  const isXrp = symbol.includes('XRP');
+  const isEth = symbol.includes('ETH');
+  const step = isXrp ? 0.001 : isEth ? 1.8 : 16.0;
+  const defaultBasePrice = isXrp ? 1.3820 : isEth ? 2540.0 : 83010.0;
+
   const entryPrice = signal ? (signal.entryPrice || (signal.entryRange.min + signal.entryRange.max) / 2) : currentPrice;
   const tpPrice = signal?.takeProfit?.[0]?.price;
   const slPrice = signal?.stopLoss?.price;
@@ -24,14 +28,13 @@ export const ModernCandleChart: React.FC<ModernCandleChartProps> = ({
 
   // Rolling tick stream (36 points buffer)
   const [liveTicks, setLiveTicks] = useState<number[]>(() => {
-    const baseP = currentPrice || (isGold ? 4189.5 : 83010.0);
-    const step = isGold ? 0.35 : 16.0;
+    const baseP = currentPrice || defaultBasePrice;
 
     const initial: number[] = [];
     for (let i = 35; i >= 0; i--) {
       const wave = Math.sin(i * 0.44) * step;
       const noise = (Math.cos(i * 1.2) - 0.5) * (step * 0.4);
-      initial.push(Math.round((baseP - wave + noise) * 100) / 100);
+      initial.push(Math.round((baseP - wave + noise) * 10000) / 10000);
     }
     initial[initial.length - 1] = baseP;
     return initial;
@@ -39,23 +42,22 @@ export const ModernCandleChart: React.FC<ModernCandleChartProps> = ({
 
   const lastSymbolRef = useRef<string>(symbol);
 
-  // Reseed buffer when asset switches (BTC <-> XAU)
+  // Reseed buffer when asset switches (BTC <-> ETH <-> XRP)
   useEffect(() => {
     if (lastSymbolRef.current !== symbol) {
       lastSymbolRef.current = symbol;
-      const baseP = currentPrice || (isGold ? 4189.5 : 83010.0);
-      const step = isGold ? 0.35 : 16.0;
+      const baseP = currentPrice || defaultBasePrice;
 
       const seeded: number[] = [];
       for (let i = 35; i >= 0; i--) {
         const wave = Math.sin(i * 0.44) * step;
         const noise = (Math.cos(i * 1.2) - 0.5) * (step * 0.4);
-        seeded.push(Math.round((baseP - wave + noise) * 100) / 100);
+        seeded.push(Math.round((baseP - wave + noise) * 10000) / 10000);
       }
       seeded[seeded.length - 1] = baseP;
       setLiveTicks(seeded);
     }
-  }, [symbol, currentPrice, isGold]);
+  }, [symbol, currentPrice, step, defaultBasePrice]);
 
   // ON EVERY TICK: Append new price & roll wave forward to the left!
   useEffect(() => {
@@ -78,7 +80,7 @@ export const ModernCandleChart: React.FC<ModernCandleChartProps> = ({
   // =========================================================================
   const { minVal, maxVal } = useMemo(() => {
     // Focused vertical window span
-    const windowSpan = isGold ? 3.8 : 160.0;
+    const windowSpan = isXrp ? 0.024 : isEth ? 35.0 : 160.0;
 
     // Center camera dynamically between current price and entry price
     const anchorY = currentPrice * 0.75 + entryPrice * 0.25;
@@ -109,7 +111,7 @@ export const ModernCandleChart: React.FC<ModernCandleChartProps> = ({
     }
 
     return { minVal: min, maxVal: max };
-  }, [currentPrice, entryPrice, tpPrice, slPrice, isGold, isBuy]);
+  }, [currentPrice, entryPrice, tpPrice, slPrice, isXrp, isEth, isBuy]);
 
   // SVG Geometry Dimensions
   const svgWidth = 500;

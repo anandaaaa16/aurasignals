@@ -1,4 +1,4 @@
-export type AssetSymbol = 'XAU/USD' | 'BTC/USDT';
+export type AssetSymbol = 'BTC/USDT' | 'ETH/USDT' | 'XRP/USDT';
 
 export type Timeframe = '5m' | '15m' | '1h' | '4h' | '1d';
 
@@ -150,4 +150,35 @@ export interface AiTradeJournalEntry {
   };
   agentCycle: 'RESEARCH' | 'TRADE' | 'JOURNAL';
   outcomeNote?: string;
+}
+
+export interface VipPaymentRequest {
+  id: string;
+  userName: string;
+  contact: string; // WhatsApp or Telegram
+  plan: '1_MONTH' | '3_MONTHS' | 'LIFETIME';
+  method: 'QRIS' | 'USDT_TRC20' | 'USDT_BEP20';
+  amount: string; // e.g. "Rp 199.000" or "$15 USDT"
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  txProofOrRef: string;
+  createdAt: number;
+  approvedPin?: string;
+}
+
+export function calculateTradeGain(trade: {
+  asset: AssetSymbol;
+  entryPrice: number;
+  exitPrice: number;
+  direction: 'BUY' | 'SELL';
+}): number {
+  const dir = trade.direction === 'BUY' ? 1 : -1;
+  const priceDiff = (trade.exitPrice - trade.entryPrice) * dir;
+  if (trade.asset === 'BTC/USDT') {
+    return priceDiff * 0.02; // 0.02 BTC ~$1,600 position
+  } else if (trade.asset === 'ETH/USDT') {
+    return priceDiff * 0.5; // 0.5 ETH ~$1,260 position
+  } else if (trade.asset === 'XRP/USDT') {
+    return priceDiff * 1000; // 1,000 XRP ~$1,380 position
+  }
+  return priceDiff * 0.02;
 }

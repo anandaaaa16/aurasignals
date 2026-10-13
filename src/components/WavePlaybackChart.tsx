@@ -1,11 +1,12 @@
 import React, { useRef, useEffect } from 'react';
+import { AssetSymbol } from '../types';
 
 interface WavePlaybackChartProps {
   points: number[];
   isWin: boolean;
   entryPrice: number;
   exitPrice: number;
-  isGold: boolean;
+  asset?: AssetSymbol;
 }
 
 export const WavePlaybackChart: React.FC<WavePlaybackChartProps> = ({
@@ -13,9 +14,10 @@ export const WavePlaybackChart: React.FC<WavePlaybackChartProps> = ({
   isWin,
   entryPrice,
   exitPrice,
-  isGold,
+  asset = 'BTC/USDT',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const decimals = asset === 'XRP/USDT' ? 4 : asset === 'ETH/USDT' ? 2 : 1;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -40,34 +42,34 @@ export const WavePlaybackChart: React.FC<WavePlaybackChartProps> = ({
     const chartW = w - padX * 2;
     const chartH = h - padTop - padBottom;
 
-    const minVal = Math.min(...points, entryPrice, exitPrice);
-    const maxVal = Math.max(...points, entryPrice, exitPrice);
-    const range = (maxVal - minVal) || 1;
+    const minP = Math.min(...points);
+    const maxP = Math.max(...points);
+    const range = maxP - minP || 1;
 
-    // Convert (index, price) to (x, y)
-    const getX = (idx: number) => padX + (idx / (points.length - 1)) * chartW;
-    const getY = (val: number) => padTop + chartH - ((val - minVal) / range) * chartH;
+    // Convert price points to canvas coordinates
+    const coords = points.map((p, idx) => {
+      const x = padX + (idx / (points.length - 1)) * chartW;
+      const y = padTop + chartH - ((p - minP) / range) * chartH;
+      return { x, y };
+    });
 
     const strokeColor = isWin ? '#10b981' : '#f43f5e';
     const glowColor = isWin ? 'rgba(16, 185, 129, 0.4)' : 'rgba(244, 63, 94, 0.4)';
-    const gradTop = isWin ? 'rgba(16, 185, 129, 0.28)' : 'rgba(244, 63, 94, 0.28)';
 
-    // Compute coordinates of points
-    const coords = points.map((p, i) => ({ x: getX(i), y: getY(p) }));
-
-    // 1. Draw glowing wave gradient fill under the curve
+    // 1. Draw subtle area fill under wave
     ctx.save();
+    const grad = ctx.createLinearGradient(0, padTop, 0, h);
+    grad.addColorStop(0, isWin ? 'rgba(16, 185, 129, 0.22)' : 'rgba(244, 63, 94, 0.22)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = grad;
+
     ctx.beginPath();
     ctx.moveTo(coords[0].x, coords[0].y);
-
-    // Smooth Bezier Curve interpolation (creates authentic smooth wave flow)
     for (let i = 0; i < coords.length - 1; i++) {
       const p0 = coords[i];
       const p1 = coords[i + 1];
       const midX = (p0.x + p1.x) / 2;
       const midY = (p0.y + p1.y) / 2;
-      const cpX1 = (midX + p0.x) / 2;
-      const cpX2 = (midX + p1.x) / 2;
       ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
     }
     const lastCoord = coords[coords.length - 1];
@@ -75,26 +77,20 @@ export const WavePlaybackChart: React.FC<WavePlaybackChartProps> = ({
     ctx.lineTo(lastCoord.x, h);
     ctx.lineTo(coords[0].x, h);
     ctx.closePath();
-
-    const areaGrad = ctx.createLinearGradient(0, padTop, 0, h);
-    areaGrad.addColorStop(0, gradTop);
-    areaGrad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
-    ctx.fillStyle = areaGrad;
     ctx.fill();
     ctx.restore();
 
-    // 2. Draw the Smooth Wave Stroke Line with Glow
+    // 2. Draw smooth continuous wave stroke
     ctx.save();
-    ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 8;
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 2.2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 8;
 
     ctx.beginPath();
     ctx.moveTo(coords[0].x, coords[0].y);
-
     for (let i = 0; i < coords.length - 1; i++) {
       const p0 = coords[i];
       const p1 = coords[i + 1];
@@ -118,7 +114,7 @@ export const WavePlaybackChart: React.FC<WavePlaybackChartProps> = ({
     ctx.fillStyle = '#cbd5e1';
     ctx.font = 'bold 9px "JetBrains Mono", monospace';
     ctx.textAlign = 'left';
-    ctx.fillText(`Entry $${entryPrice.toFixed(isGold ? 1 : 0)}`, coords[0].x + 6, coords[0].y + (coords[0].y > h / 2 ? -6 : 12));
+    ctx.fillText(`Entry $${entryPrice.toFixed(decimals)}`, coords[0].x + 6, coords[0].y + (coords[0].y > h / 2 ? -6 : 12));
     ctx.restore();
 
     // 4. Draw Exit Point Marker (Right - Hit TP or Hit SL)
@@ -140,10 +136,10 @@ export const WavePlaybackChart: React.FC<WavePlaybackChartProps> = ({
     ctx.fillStyle = isWin ? '#34d399' : '#f87171';
     ctx.font = 'bold 9px "JetBrains Mono", monospace';
     ctx.textAlign = 'right';
-    const tag = isWin ? `TP $${exitPrice.toFixed(isGold ? 1 : 0)}` : `SL $${exitPrice.toFixed(isGold ? 1 : 0)}`;
+    const tag = isWin ? `TP $${exitPrice.toFixed(decimals)}` : `SL $${exitPrice.toFixed(decimals)}`;
     ctx.fillText(tag, lastCoord.x - 8, lastCoord.y + (lastCoord.y > h / 2 ? -6 : 12));
     ctx.restore();
-  }, [points, isWin, entryPrice, exitPrice, isGold]);
+  }, [points, isWin, entryPrice, exitPrice, decimals]);
 
   return (
     <div className="w-full h-20 sm:h-24 relative overflow-hidden rounded-xl bg-slate-950/40 border border-white/5 my-1.5">

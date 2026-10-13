@@ -2,43 +2,13 @@ import { SignalData, AiTradeJournalEntry } from '../types';
 
 /**
  * AI Trading Agent Engine
- * 24/7 Autonomous Trading Agent architecture:
- * - Research: Evaluates live market ticks & H1 structure
- * - Trade: 1.5% max capital risk guard
- * - Journal: Execution setup & confluence rationale
+ * 24/7 Autonomous Trading Agent architecture for Crypto (BTC, ETH, XRP)
  */
 
 export function generateLiveJournalEntry(
   signal: SignalData | null,
-  currentPrice: number,
-  isMarketClosed: boolean
+  currentPrice: number
 ): AiTradeJournalEntry | null {
-  if (isMarketClosed) {
-    return {
-      id: `journal-standby-${Date.now()}`,
-      timestamp: Date.now(),
-      timeStr: 'Standby Mode',
-      asset: 'XAU/USD',
-      action: 'HOLD',
-      confidence: 100,
-      setupRationale:
-        'XAU/USD market is closed for the weekend. Research-only standby cycle to protect trading capital.',
-      riskGuard: {
-        maxCapitalRiskDollar: 0,
-        riskPercent: 0,
-        targetRewardRatio: '0:0',
-        invalidationPrice: 0,
-      },
-      technicalEvidence: {
-        marketStructure: 'Weekend Inactive Session',
-        keyLevel: 'Spread Protection Active',
-        momentumSignal: 'Zero Volume Flow',
-      },
-      agentCycle: 'JOURNAL',
-      outcomeNote: 'All positions flat. Ready for market open Monday 00:00 UTC.',
-    };
-  }
-
   if (!signal) return null;
 
   const isBuy = signal.signal.includes('BUY');
@@ -46,9 +16,13 @@ export function generateLiveJournalEntry(
   const slPrice = signal.stopLoss.price;
   const tpPrice = signal.takeProfit[0]?.price;
 
-  const isGold = signal.asset === 'XAU/USD';
   const slDistance = Math.abs(entryPrice - slPrice);
-  const dollarRisk = isGold ? slDistance * 5 : slDistance * 0.02;
+  const dollarRisk =
+    signal.asset === 'BTC/USDT'
+      ? slDistance * 0.02
+      : signal.asset === 'ETH/USDT'
+      ? slDistance * 0.5
+      : slDistance * 1000;
   const riskPercent = Math.round((dollarRisk / 500) * 100 * 10) / 10;
 
   const now = new Date();
@@ -60,21 +34,34 @@ export function generateLiveJournalEntry(
   let keyLevel = '';
   let momentumSignal = '';
 
-  if (isGold) {
+  if (signal.asset === 'ETH/USDT') {
     if (isBuy) {
-      setupRationale = `Strong rejection at demand zone $${(entryPrice - 2.5).toFixed(1)}. Sell-side liquidity swept and H1 micro structure prints higher low.`;
-      marketStructure = 'Bullish Order Block Shift';
-      keyLevel = `Support $${(entryPrice - 2.0).toFixed(1)}`;
-      momentumSignal = 'RSI Oversold Recovery & Positive Delta';
+      setupRationale = `Ethereum rebounded from institutional demand zone $${(entryPrice - 18).toFixed(1)}. Gas flow surge and L2 velocity confirm buyer absorption.`;
+      marketStructure = 'Bullish Demand Shift';
+      keyLevel = `Dynamic Support $${(entryPrice - 15).toFixed(1)}`;
+      momentumSignal = 'RSI Oversold Reclaim & Positive Volume Delta';
     } else {
-      setupRationale = `Rejection at supply resistance $${(entryPrice + 2.5).toFixed(1)}. Bearish Fair Value Gap confirmed with decreasing buyer momentum.`;
+      setupRationale = `Rejection at upper distribution level $${(entryPrice + 18).toFixed(1)}. Bearish Fair Value Gap confirmed with slowing bid momentum.`;
       marketStructure = 'Bearish Liquidity Sweep';
-      keyLevel = `Resistance $${(entryPrice + 2.0).toFixed(1)}`;
-      momentumSignal = 'Bearish Divergence on H1 Momentum';
+      keyLevel = `Resistance $${(entryPrice + 15).toFixed(1)}`;
+      momentumSignal = 'Bearish Momentum Divergence on H1';
+    }
+  } else if (signal.asset === 'XRP/USDT') {
+    if (isBuy) {
+      setupRationale = `XRP aggressive perp accumulation above $${(entryPrice - 0.015).toFixed(4)}. Heavy volume absorption defending local structure.`;
+      marketStructure = 'High-Volume Order Block Reclaim';
+      keyLevel = `Support $${(entryPrice - 0.012).toFixed(4)}`;
+      momentumSignal = 'MACD Expansion & Bullish Tape Pressure';
+    } else {
+      setupRationale = `Failed breakout at local range high $${(entryPrice + 0.015).toFixed(4)}. Exhaustion wick confirms short-term mean reversion.`;
+      marketStructure = 'Range High Rejection';
+      keyLevel = `Supply Level $${(entryPrice + 0.012).toFixed(4)}`;
+      momentumSignal = 'RSI Bearish Rejection @ 70';
     }
   } else {
+    // BTC/USDT
     if (isBuy) {
-      setupRationale = `Bitcoin rebound from institutional accumulation pool $${(entryPrice - 350).toFixed(0)}. Reclaiming EMA-50 targeting liquidity expansion to $${tpPrice?.toFixed(0)}.`;
+      setupRationale = `Bitcoin rebound from institutional accumulation pool $${(entryPrice - 350).toFixed(0)}. Reclaiming EMA-50 targeting expansion to $${tpPrice?.toFixed(0)}.`;
       marketStructure = 'Institutional Accumulation Sweep';
       keyLevel = `Value Area Low $${(entryPrice - 300).toFixed(0)}`;
       momentumSignal = 'MACD Bullish Crossover & Strong Delta';
@@ -110,5 +97,4 @@ export function generateLiveJournalEntry(
   };
 }
 
-// Fresh Start: Empty audit journal array
 export const INITIAL_AI_JOURNALS: AiTradeJournalEntry[] = [];

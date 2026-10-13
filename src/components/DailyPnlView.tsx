@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ClosedTrade } from '../types';
+import { ClosedTrade, calculateTradeGain } from '../types';
 import { Calendar, TrendingUp, TrendingDown, CheckCircle2, XCircle } from 'lucide-react';
 
 interface DailyPnlViewProps {
@@ -41,13 +41,7 @@ export const DailyPnlView: React.FC<DailyPnlViewProps> = ({ trades }) => {
 
       const totalPips = items.reduce((acc, t) => acc + t.pnlPips, 0);
 
-      const netDollar = items.reduce((acc, t) => {
-        const gain =
-          t.asset === 'XAU/USD'
-            ? (t.exitPrice - t.entryPrice) * (t.direction === 'BUY' ? 1 : -1) * 5
-            : (t.exitPrice - t.entryPrice) * (t.direction === 'BUY' ? 1 : -1) * 0.02;
-        return acc + gain;
-      }, 0);
+      const netDollar = items.reduce((acc, t) => acc + calculateTradeGain(t), 0);
 
       const netPercent = Math.round((netDollar / 500) * 100 * 10) / 10;
 

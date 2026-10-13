@@ -125,8 +125,15 @@ export function verifySixDigitCode(code: string): { success: boolean; role: 'ADM
     };
   }
 
+  // Check stored active custom VIP PINs
+  let dynamicPins: string[] = [];
+  try {
+    const raw = localStorage.getItem('aurasignals_approved_vip_pins');
+    if (raw) dynamicPins = JSON.parse(raw);
+  } catch (e) {}
+
   // VIP Member PINs
-  const validMemberCodes = ['777888', '123456', '999888', '555666'];
+  const validMemberCodes = ['777888', '123456', '999888', '555666', ...dynamicPins];
   if (validMemberCodes.includes(cleanCode)) {
     return {
       success: true,
@@ -138,6 +145,62 @@ export function verifySixDigitCode(code: string): { success: boolean; role: 'ADM
   return {
     success: false,
     role: 'GUEST',
-    message: 'Invalid 6-Digit PIN. Contact Admin for VIP Access.',
+    message: 'Invalid 6-Digit PIN. Contact Admin or upgrade to VIP.',
   };
+}
+
+// 7. VIP Payment Requests in Firestore
+const VIP_REQUESTS_COLLECTION = 'vipRequests';
+
+export async function submitVipPaymentRequest(request: import('../types').VipPaymentRequest): Promise<boolean> {
+  try {
+    await setDoc(doc(db, VIP_REQUESTS_COLLECTION, request.id), request);
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `${VIP_REQUESTS_COLLECTION}/${request.id}`);
+    return false;
+  }
+}
+
+export function subscribeToVipPaymentRequests(
+  onUpdate: (requests: import('../types').VipPaymentRequest[]) => void
+) {
+  try {
+    const q = query(collection(db, VIP_REQUESTS_COLLECTION), orderBy('createdAt', 'desc'), limit(30));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const reqs: import('../types').VipPaymentRequest[] = [];
+        snapshot.forEach((d) => reqs.push(d.data() as import('../types').VipPaymentRequest));
+        onUpdate(reqs);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, VIP_REQUESTS_COLLECTION);
+      }
+    );
+  } catch (err) {
+    return () => {};
+  }
+}
+
+export async function approveVipPayment(requestId: string, pin: string): Promise<boolean> {
+  try {
+    await setDoc(
+      doc(db, VIP_REQUESTS_COLLECTION, requestId),
+      { status: 'APPROVED', approvedPin: pin },
+      { merge: true }
+    );
+    // Also save into local allowed list
+    try {
+      const raw = localStorage.getItem('aurasignals_approved_vip_pins');
+      const existing = raw ? JSON.parse(raw) : [];
+      if (!existing.includes(pin)) {
+        existing.push(pin);
+        localStorage.setItem('aurasignals_approved_vip_pins', JSON.stringify(existing));
+      }
+    } catch (e) {}
+    return true;
+  } catch (err) {
+    return false;
+  }
 }

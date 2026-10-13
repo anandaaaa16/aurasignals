@@ -7,6 +7,7 @@ interface AccessCodeModalProps {
   onClose: () => void;
   currentRole: UserRoleSession['role'];
   onRoleChange: (role: UserRoleSession['role'], code: string) => void;
+  onOpenVipPayment?: () => void;
 }
 
 export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
@@ -14,6 +15,7 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
   onClose,
   currentRole,
   onRoleChange,
+  onOpenVipPayment,
 }) => {
   const [pin, setPin] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -180,10 +182,18 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
               </button>
             </div>
 
-            <div className="text-center pt-1">
-              <span className="text-[10px] text-slate-500 font-mono">
-                Admin: <strong className="text-teal-400">889900</strong> · VIP Member: <strong className="text-teal-400">777888</strong>
-              </span>
+            <div className="text-center pt-2 border-t border-white/5 space-y-1">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  if (onOpenVipPayment) onOpenVipPayment();
+                }}
+                className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-teal-500/20 to-emerald-500/20 hover:from-amber-500/30 hover:to-emerald-500/30 border border-amber-500/30 text-amber-300 font-mono text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/10"
+              >
+                <span>Don't have a VIP code? Get VIP Access</span>
+                <span className="text-[10px] bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded font-black">QRIS / USDT</span>
+              </button>
             </div>
           </div>
         )}

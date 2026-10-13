@@ -6,7 +6,6 @@ interface AssetHeroProps {
   onSelectAsset: (asset: AssetSymbol) => void;
   currentTicker: MarketTicker | null;
   priceTickDirection: 'up' | 'down' | 'neutral';
-  isMarketClosed?: boolean;
 }
 
 export const AssetHero: React.FC<AssetHeroProps> = ({
@@ -14,9 +13,25 @@ export const AssetHero: React.FC<AssetHeroProps> = ({
   onSelectAsset,
   currentTicker,
   priceTickDirection,
-  isMarketClosed,
 }) => {
   const isUp = (currentTicker?.change24h || 0) >= 0;
+
+  const assetDetails: Record<AssetSymbol, { short: string; full: string; decimals: number }> = {
+    'BTC/USDT': { short: 'BTC', full: 'Bitcoin', decimals: 2 },
+    'ETH/USDT': { short: 'ETH', full: 'Ethereum', decimals: 2 },
+    'XRP/USDT': { short: 'XRP', full: 'Ripple', decimals: 4 },
+  };
+
+  const current = assetDetails[selectedAsset] || { short: 'BTC', full: 'Bitcoin', decimals: 2 };
+
+  const formatPrice = (val?: number) => {
+    if (!val) return '---.--';
+    if (current.decimals === 4) return val.toFixed(4);
+    return val.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
 
   return (
     <div className="pt-0.5 pb-1 px-1 sm:px-2">
@@ -24,49 +39,34 @@ export const AssetHero: React.FC<AssetHeroProps> = ({
       <div className="flex items-center justify-between gap-3 mb-0.5">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white font-mono flex items-center gap-1.5">
-            <span>{selectedAsset === 'BTC/USDT' ? 'BTC' : 'XAU'}</span>
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                isMarketClosed
-                  ? 'bg-amber-400'
-                  : 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400'
-              }`}
-            />
+            <span>{current.short}</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400" />
           </h1>
 
           <span className="text-[11px] font-semibold text-teal-300/90 bg-teal-950/60 border border-teal-500/20 px-2 py-0.5 rounded-lg">
-            {selectedAsset === 'BTC/USDT' ? 'Bitcoin' : 'Spot Gold'}
+            {current.full}
           </span>
-
-          {isMarketClosed && (
-            <span className="text-[10px] font-mono text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md font-semibold">
-              Weekend Closure
-            </span>
-          )}
         </div>
 
-        {/* Asset Switcher (BTC / GOLD) */}
-        <div className="inline-flex p-0.5 bg-[#021317]/90 border border-teal-500/25 rounded-xl shadow-inner">
-          <button
-            onClick={() => onSelectAsset('BTC/USDT')}
-            className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-              selectedAsset === 'BTC/USDT'
-                ? 'bg-gradient-to-r from-teal-400 to-emerald-400 text-slate-950 shadow-md font-black'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            BTC
-          </button>
-          <button
-            onClick={() => onSelectAsset('XAU/USD')}
-            className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-              selectedAsset === 'XAU/USD'
-                ? 'bg-gradient-to-r from-teal-400 to-emerald-400 text-slate-950 shadow-md font-black'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            GOLD
-          </button>
+        {/* Asset Switcher (BTC / ETH / XRP) */}
+        <div className="inline-flex p-0.5 bg-[#021317]/90 border border-teal-500/25 rounded-xl shadow-inner font-mono">
+          {(['BTC/USDT', 'ETH/USDT', 'XRP/USDT'] as AssetSymbol[]).map((sym) => {
+            const shortName = sym.split('/')[0];
+            const isSelected = selectedAsset === sym;
+            return (
+              <button
+                key={sym}
+                onClick={() => onSelectAsset(sym)}
+                className={`px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-gradient-to-r from-teal-400 to-emerald-400 text-slate-950 shadow-md font-black'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {shortName}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -81,10 +81,7 @@ export const AssetHero: React.FC<AssetHeroProps> = ({
               : 'text-white border border-transparent'
           }`}
         >
-          ${currentTicker?.price?.toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          }) || '---.--'}
+          ${formatPrice(currentTicker?.price)}
         </div>
       </div>
 
@@ -94,7 +91,7 @@ export const AssetHero: React.FC<AssetHeroProps> = ({
           {isUp ? '↗' : '↘'}
         </span>
         <span className="text-slate-300">
-          24h High: ${currentTicker?.high24h?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '---'}
+          24h High: ${formatPrice(currentTicker?.high24h)}
         </span>
         <span className="text-slate-500">·</span>
         <span className={isUp ? 'text-emerald-400' : 'text-rose-400'}>

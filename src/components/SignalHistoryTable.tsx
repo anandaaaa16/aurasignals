@@ -160,12 +160,20 @@ export const SignalHistoryTable: React.FC<SignalHistoryTableProps> = ({ trades }
             BTC
           </button>
           <button
-            onClick={() => setAssetFilter('XAU/USD')}
+            onClick={() => setAssetFilter('ETH/USDT')}
             className={`px-2 py-0.5 rounded font-bold cursor-pointer ${
-              assetFilter === 'XAU/USD' ? 'bg-teal-500/20 text-teal-300' : 'text-slate-400'
+              assetFilter === 'ETH/USDT' ? 'bg-teal-500/20 text-teal-300' : 'text-slate-400'
             }`}
           >
-            GOLD
+            ETH
+          </button>
+          <button
+            onClick={() => setAssetFilter('XRP/USDT')}
+            className={`px-2 py-0.5 rounded font-bold cursor-pointer ${
+              assetFilter === 'XRP/USDT' ? 'bg-teal-500/20 text-teal-300' : 'text-slate-400'
+            }`}
+          >
+            XRP
           </button>
         </div>
       </div>
@@ -186,8 +194,6 @@ export const SignalHistoryTable: React.FC<SignalHistoryTableProps> = ({ trades }
           filteredTrades.map((t) => {
             const isWin = t.hitType === 'HIT_TP';
             const isBuy = t.direction === 'BUY';
-            const isGold = t.asset === 'XAU/USD';
-
             return (
               <div
                 key={t.id}
@@ -240,7 +246,7 @@ export const SignalHistoryTable: React.FC<SignalHistoryTableProps> = ({ trades }
                         {t.pnlPercent >= 0 ? '+' : ''}{t.pnlPercent.toFixed(2)}%
                       </span>
                       <span className="text-[10px] text-slate-400">
-                        ({t.pnlPips >= 0 ? '+' : ''}{t.pnlPips} {isGold ? 'pips' : 'pts'})
+                        ({t.pnlPips >= 0 ? '+' : ''}{t.pnlPips} pts)
                       </span>
                     </div>
                   </div>
@@ -252,7 +258,7 @@ export const SignalHistoryTable: React.FC<SignalHistoryTableProps> = ({ trades }
                   isWin={isWin}
                   entryPrice={t.entryPrice}
                   exitPrice={t.exitPrice}
-                  isGold={isGold}
+                  asset={t.asset}
                 />
               </div>
             );
