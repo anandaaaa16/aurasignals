@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { AiTradeJournalEntry, SignalData } from '../types';
-import { Brain, ShieldCheck, FileText, ChevronDown, ChevronUp, Zap, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { AiTradeJournalEntry } from '../types';
+import { Brain, ShieldCheck, FileText, ChevronDown, ChevronUp, Zap, Clock } from 'lucide-react';
 
 interface AiTradeJournalCardProps {
   currentJournal: AiTradeJournalEntry | null;
@@ -17,7 +17,7 @@ export const AiTradeJournalCard: React.FC<AiTradeJournalCardProps> = ({
 
   return (
     <div className="glass-panel rounded-3xl p-4 sm:p-5 border border-teal-500/25 shadow-2xl space-y-3.5 backdrop-blur-2xl">
-      {/* Top Header: AI Trading Agent & 3-Step Autonomous Loop Status */}
+      {/* Top Header: AI Trading Agent & Risk Guard */}
       <div className="flex items-center justify-between border-b border-teal-500/15 pb-2.5">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-xl bg-teal-500/15 border border-teal-500/30 text-teal-300">
@@ -28,9 +28,6 @@ export const AiTradeJournalCard: React.FC<AiTradeJournalCardProps> = ({
               <span>AI Trading Agent</span>
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400" />
             </h3>
-            <span className="text-[10px] text-teal-400/80 font-mono block">
-              Siklus: Research ➔ Trade ➔ Journal
-            </span>
           </div>
         </div>
 
@@ -42,7 +39,7 @@ export const AiTradeJournalCard: React.FC<AiTradeJournalCardProps> = ({
         </div>
       </div>
 
-      {/* Jurnal Posisi Aktif Saat Ini */}
+      {/* Current Active Trade Log */}
       {currentJournal ? (
         <div className="space-y-3">
           {/* Action & Confidence Bar */}
@@ -60,7 +57,7 @@ export const AiTradeJournalCard: React.FC<AiTradeJournalCardProps> = ({
                 {currentJournal.action} {currentJournal.asset}
               </span>
               <span className="text-[11px] text-slate-400">
-                Pukul {currentJournal.timeStr}
+                {currentJournal.timeStr}
               </span>
             </div>
 
@@ -70,22 +67,22 @@ export const AiTradeJournalCard: React.FC<AiTradeJournalCardProps> = ({
             </div>
           </div>
 
-          {/* Rationale / Alasan Mengapa Posisi Dibuka */}
+          {/* Rationale / Setup Log */}
           <div className="p-3 rounded-2xl bg-slate-950/70 border border-teal-500/20 space-y-1.5">
             <div className="flex items-center gap-1.5 text-[11px] font-mono text-teal-300 font-bold">
               <FileText className="w-3.5 h-3.5 text-teal-400" />
-              <span>Analisa & Alasan Masuk Pasar (Setup Log):</span>
+              <span>Trade Setup Rationale:</span>
             </div>
             <p className="text-xs text-slate-200 leading-relaxed font-sans">
               {currentJournal.setupRationale}
             </p>
           </div>
 
-          {/* 3-Layer Risk Protection & Technical Evidence Grid */}
+          {/* Risk Protection & Technical Evidence Grid */}
           <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
             <div className="p-2.5 rounded-2xl bg-slate-900/50 border border-white/5 space-y-1">
               <span className="text-[10px] text-slate-400 block font-semibold">
-                🛡️ Proteksi Risiko Akun
+                Risk Guard
               </span>
               <div className="text-slate-200">
                 Max Loss: <strong className="text-rose-400">${currentJournal.riskGuard.maxCapitalRiskDollar.toFixed(2)}</strong> ({currentJournal.riskGuard.riskPercent}%)
@@ -97,7 +94,7 @@ export const AiTradeJournalCard: React.FC<AiTradeJournalCardProps> = ({
 
             <div className="p-2.5 rounded-2xl bg-slate-900/50 border border-white/5 space-y-1">
               <span className="text-[10px] text-slate-400 block font-semibold">
-                ⚡ Konfirmasi Teknikal
+                Technical Confluence
               </span>
               <div className="text-slate-300 truncate" title={currentJournal.technicalEvidence.marketStructure}>
                 {currentJournal.technicalEvidence.marketStructure}
@@ -112,17 +109,17 @@ export const AiTradeJournalCard: React.FC<AiTradeJournalCardProps> = ({
         <div className="p-4 rounded-2xl bg-slate-950/60 border border-teal-500/15 text-center space-y-1">
           <Clock className="w-5 h-5 text-teal-400 mx-auto animate-pulse" />
           <p className="text-xs font-mono font-bold text-slate-200">
-            {isMarketClosed ? 'Bursa Libur · AI Agent Standby' : 'AI Agent Scanning Market...'}
+            {isMarketClosed ? 'Market Closed · Standby' : 'Scanning Market Conditions...'}
           </p>
           <p className="text-[11px] text-slate-400 font-mono">
             {isMarketClosed
-              ? 'Posisi otomatis ditutup flat tanpa risiko akhir pekan.'
-              : 'Menunggu konfirmasi pola probabilitas tinggi sebelum entry.'}
+              ? 'Positions closed flat without weekend risk.'
+              : 'Waiting for high-probability confluence confirmation.'}
           </p>
         </div>
       )}
 
-      {/* Accordion Toggle: Riwayat Audit Jurnal Sebelumnya */}
+      {/* Accordion Toggle: Journal History */}
       <div className="pt-1 border-t border-teal-500/15">
         <button
           onClick={() => setShowHistory(!showHistory)}
@@ -130,7 +127,7 @@ export const AiTradeJournalCard: React.FC<AiTradeJournalCardProps> = ({
         >
           <span className="flex items-center gap-1.5 font-semibold">
             <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span>Audit Trail: Catatan Jurnal Sebelumnya ({historicalJournals.length})</span>
+            <span>Journal History ({historicalJournals.length})</span>
           </span>
           {showHistory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </button>
@@ -159,12 +156,6 @@ export const AiTradeJournalCard: React.FC<AiTradeJournalCardProps> = ({
                 <p className="text-slate-400 text-[11px] font-sans leading-relaxed">
                   {item.setupRationale}
                 </p>
-
-                {item.outcomeNote && (
-                  <div className="text-[10px] text-slate-300 font-semibold pt-0.5 border-t border-white/5">
-                    {item.outcomeNote}
-                  </div>
-                )}
               </div>
             ))}
           </div>

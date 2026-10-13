@@ -1,11 +1,11 @@
-import { AssetSymbol, ClosedTrade, SignalData, AiTradeJournalEntry } from '../types';
+import { SignalData, AiTradeJournalEntry } from '../types';
 
 /**
  * AI Trading Agent Engine
- * Mengadopsi arsitektur 24/7 Autonomous Trading Agent (MindStudio Pattern):
- * 1. Research: Evaluasi data pasar real-time & struktur harga H1
- * 2. Trade: Sizing risiko modal $500 (max 1.5% loss per transaksi)
- * 3. Journal: Pembuatan catatan alasan eksekusi transparan
+ * 24/7 Autonomous Trading Agent architecture:
+ * - Research: Evaluates live market ticks & H1 structure
+ * - Trade: 1.5% max capital risk guard
+ * - Journal: Execution setup & confluence rationale
  */
 
 export function generateLiveJournalEntry(
@@ -22,7 +22,7 @@ export function generateLiveJournalEntry(
       action: 'HOLD',
       confidence: 100,
       setupRationale:
-        'Bursa XAU/USD tutup akhir pekan. Agen berada dalam siklus Research-Only, menolak pembukaan order baru demi perlindungan modal.',
+        'XAU/USD market is closed for the weekend. Research-only standby cycle to protect trading capital.',
       riskGuard: {
         maxCapitalRiskDollar: 0,
         riskPercent: 0,
@@ -35,7 +35,7 @@ export function generateLiveJournalEntry(
         momentumSignal: 'Zero Volume Flow',
       },
       agentCycle: 'JOURNAL',
-      outcomeNote: 'Semua posisi ditutup flat. Siap evaluasi saat sesi buka Senin 05:00 WIB.',
+      outcomeNote: 'All positions flat. Ready for market open Monday 00:00 UTC.',
     };
   }
 
@@ -47,14 +47,13 @@ export function generateLiveJournalEntry(
   const tpPrice = signal.takeProfit[0]?.price;
 
   const isGold = signal.asset === 'XAU/USD';
-  const lotSize = isGold ? 0.05 : 0.02;
   const slDistance = Math.abs(entryPrice - slPrice);
   const dollarRisk = isGold ? slDistance * 5 : slDistance * 0.02;
   const riskPercent = Math.round((dollarRisk / 500) * 100 * 10) / 10;
 
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
-  const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())} WIB`;
+  const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())} UTC`;
 
   let setupRationale = '';
   let marketStructure = '';
@@ -63,24 +62,24 @@ export function generateLiveJournalEntry(
 
   if (isGold) {
     if (isBuy) {
-      setupRationale = `Rejeksi kuat pada demand zone $${(entryPrice - 2.5).toFixed(1)}. Likuiditas sell-side terambil dan struktur mikro H1 membentuk higher low.`;
+      setupRationale = `Strong rejection at demand zone $${(entryPrice - 2.5).toFixed(1)}. Sell-side liquidity swept and H1 micro structure prints higher low.`;
       marketStructure = 'Bullish Order Block Shift';
       keyLevel = `Support $${(entryPrice - 2.0).toFixed(1)}`;
-      momentumSignal = 'RSI Oversold Recovery & Bullish Delta';
+      momentumSignal = 'RSI Oversold Recovery & Positive Delta';
     } else {
-      setupRationale = `Penolakan pada supply resistance $${(entryPrice + 2.5).toFixed(1)}. Pembentukan Fair Value Gap bearish dengan konfirmasi pelemahan volume beli.`;
+      setupRationale = `Rejection at supply resistance $${(entryPrice + 2.5).toFixed(1)}. Bearish Fair Value Gap confirmed with decreasing buyer momentum.`;
       marketStructure = 'Bearish Liquidity Sweep';
       keyLevel = `Resistance $${(entryPrice + 2.0).toFixed(1)}`;
-      momentumSignal = 'Bearish Divergence pada H1 Momentum';
+      momentumSignal = 'Bearish Divergence on H1 Momentum';
     }
   } else {
     if (isBuy) {
-      setupRationale = `Bitcoin memantul dari area akumulasi institusional $${(entryPrice - 350).toFixed(0)}. Reclaiming EMA-50 dengan target ekspansi likuiditas ke $${tpPrice?.toFixed(0)}.`;
+      setupRationale = `Bitcoin rebound from institutional accumulation pool $${(entryPrice - 350).toFixed(0)}. Reclaiming EMA-50 targeting liquidity expansion to $${tpPrice?.toFixed(0)}.`;
       marketStructure = 'Institutional Accumulation Sweep';
       keyLevel = `Value Area Low $${(entryPrice - 300).toFixed(0)}`;
       momentumSignal = 'MACD Bullish Crossover & Strong Delta';
     } else {
-      setupRationale = `Gagal menembus batas atas range $${(entryPrice + 400).toFixed(0)}. Indikasi distribusi lokal dengan stop loss ketat di atas swing high terakhir.`;
+      setupRationale = `Failed expansion at upper range boundary $${(entryPrice + 400).toFixed(0)}. Local distribution with tight invalidation above recent swing high.`;
       marketStructure = 'Distribution Break of Structure';
       keyLevel = `Value Area High $${(entryPrice + 350).toFixed(0)}`;
       momentumSignal = 'RSI Bearish Rejection @ 68';
@@ -107,10 +106,9 @@ export function generateLiveJournalEntry(
       momentumSignal,
     },
     agentCycle: 'TRADE',
-    outcomeNote: 'Posisi aktif berjalan. Hard Stop Loss dan Take Profit terpasang otomatis.',
+    outcomeNote: 'Active position monitored. Hard Stop Loss and Take Profit engaged.',
   };
 }
 
-// Fresh Start: Riwayat audit jurnal dimulai bersih dari 0 untuk hari ini
+// Fresh Start: Empty audit journal array
 export const INITIAL_AI_JOURNALS: AiTradeJournalEntry[] = [];
-

@@ -9,13 +9,13 @@ export function isGoldMarketOpen(date = new Date()): { isOpen: boolean; reason?:
   const hour = date.getUTCHours();
 
   if (day === 6) {
-    return { isOpen: false, reason: 'Bursa Emas Tutup Akhir Pekan (Sabtu)' };
+    return { isOpen: false, reason: 'Market Closed (Saturday)' };
   }
   if (day === 0 && hour < 22) {
-    return { isOpen: false, reason: 'Bursa Emas Tutup Akhir Pekan (Minggu)' };
+    return { isOpen: false, reason: 'Market Closed (Sunday)' };
   }
   if (day === 5 && hour >= 21) {
-    return { isOpen: false, reason: 'Bursa Emas Tutup Akhir Pekan (Jumat Malam)' };
+    return { isOpen: false, reason: 'Market Closed (Friday Night)' };
   }
 
   return { isOpen: true };
@@ -44,7 +44,7 @@ const TF_MAP: Record<string, TfConfig> = {
     btcTp2Pts: 580,
     btcTp3Pts: 950,
     btcSlPts: 220,
-    horizon: 'M5 Scalp (Posisi Cepat)',
+    horizon: 'M5 Scalp Execution',
   },
   '15m': {
     goldTp1Pips: 55,
@@ -55,7 +55,7 @@ const TF_MAP: Record<string, TfConfig> = {
     btcTp2Pts: 1350,
     btcTp3Pts: 2100,
     btcSlPts: 520,
-    horizon: 'M15 Intraday (Menunggu TP/SL)',
+    horizon: 'M15 Intraday Position',
   },
   '1h': {
     goldTp1Pips: 120,
@@ -189,9 +189,9 @@ export function generateInstantSignal(
       timeDuration: { durationLabel: cfg.horizon },
       entryRange: { min: entryMin, max: entryMax },
       takeProfit: [
-        { target: 'TP 1 (Target Utama)', price: tp1, pipsOrPoints: cfg.goldTp1Pips },
-        { target: 'TP 2 (Target Struktur)', price: tp2, pipsOrPoints: cfg.goldTp2Pips },
-        { target: 'TP 3 (Runner Liquidity)', price: tp3, pipsOrPoints: cfg.goldTp3Pips },
+        { target: 'TP 1', price: tp1, pipsOrPoints: cfg.goldTp1Pips },
+        { target: 'TP 2', price: tp2, pipsOrPoints: cfg.goldTp2Pips },
+        { target: 'TP 3', price: tp3, pipsOrPoints: cfg.goldTp3Pips },
       ],
       stopLoss: {
         price: sl,
@@ -199,17 +199,17 @@ export function generateInstantSignal(
         riskRewardRatio: `1 : ${rr}`,
       },
       technicalConfluence: [
-        `Momentum breakout order block ${timeframe} terkonfirmasi volume institusional.`,
-        `Rejeksi harga pada support dinamis mengindikasikan kelanjutan arah tren.`,
+        `Momentum breakout of ${timeframe} order block confirmed with institutional volume.`,
+        `Dynamic support bounce confirms structural trend continuation.`,
       ],
       smartMoneyConcept: {
-        liquidityZone: `Target Likuiditas di $${Math.round((price + tp2Diff * 1.2) * 10) / 10}`,
-        orderBlock: `Order Block ${timeframe} di $${entryMin} - $${entryMax}`,
-        fairValueGap: `FVG Mitigasi di level $${Math.round((price - entryOffset * 0.5) * 10) / 10}`,
+        liquidityZone: `Target Liquidity at $${Math.round((price + tp2Diff * 1.2) * 10) / 10}`,
+        orderBlock: `Order Block ${timeframe} at $${entryMin} - $${entryMax}`,
+        fairValueGap: `FVG Mitigation at $${Math.round((price - entryOffset * 0.5) * 10) / 10}`,
         marketBias: isUp ? 'Bullish Expansion' : 'Bearish Liquidity Run',
       },
-      macroeconomicCatalyst: 'Pelemahan DXY memberi dorongan bullish signifikan pada Emas.',
-      riskManagementNote: 'Posisi akan otomatis close dan berganti saat menyentuh TP atau SL.',
+      macroeconomicCatalyst: 'DXY softening provides strong bullish tailwinds for Gold.',
+      riskManagementNote: 'Hard TP and SL managed automatically.',
       status: 'RUNNING',
     };
   } else {
@@ -239,9 +239,9 @@ export function generateInstantSignal(
       timeDuration: { durationLabel: cfg.horizon },
       entryRange: { min: entryMin, max: entryMax },
       takeProfit: [
-        { target: 'TP 1 (Target Utama)', price: tp1, pipsOrPoints: cfg.btcTp1Pts },
-        { target: 'TP 2 (Target Struktur)', price: tp2, pipsOrPoints: cfg.btcTp2Pts },
-        { target: 'TP 3 (Runner Liquidity)', price: tp3, pipsOrPoints: cfg.btcTp3Pts },
+        { target: 'TP 1', price: tp1, pipsOrPoints: cfg.btcTp1Pts },
+        { target: 'TP 2', price: tp2, pipsOrPoints: cfg.btcTp2Pts },
+        { target: 'TP 3', price: tp3, pipsOrPoints: cfg.btcTp3Pts },
       ],
       stopLoss: {
         price: sl,
@@ -249,17 +249,17 @@ export function generateInstantSignal(
         riskRewardRatio: `1 : ${rr}`,
       },
       technicalConfluence: [
-        `Struktur pergerakan ${timeframe} breakout dengan konfirmasi volume tinggi.`,
-        `Reclaim level support lokal mengindikasikan kelanjutan tren.`,
+        `Market structure ${timeframe} breakout supported by rising volume delta.`,
+        `Local liquidity reclaim indicates continuation toward target.`,
       ],
       smartMoneyConcept: {
-        liquidityZone: `Target Likuiditas di $${Math.round(price + cfg.btcTp2Pts * 1.1)}`,
-        orderBlock: `Institutional OB ${timeframe} di $${entryMin} - $${entryMax}`,
-        fairValueGap: `Mitigasi FVG ${timeframe} di level $${Math.round(price - entryOffset * 0.4)}`,
+        liquidityZone: `Target Liquidity at $${Math.round(price + cfg.btcTp2Pts * 1.1)}`,
+        orderBlock: `Institutional OB ${timeframe} at $${entryMin} - $${entryMax}`,
+        fairValueGap: `Mitigation FVG ${timeframe} at $${Math.round(price - entryOffset * 0.4)}`,
         marketBias: isUp ? 'Bullish Expansion' : 'Bearish Liquidity Run',
       },
-      macroeconomicCatalyst: 'Sentimen inflow ETF Bitcoin menopang kekuatan beli.',
-      riskManagementNote: 'Posisi akan otomatis close dan berganti saat menyentuh TP atau SL.',
+      macroeconomicCatalyst: 'Bitcoin spot ETF net inflow momentum supports buying pressure.',
+      riskManagementNote: 'Hard TP and SL managed automatically.',
       status: 'RUNNING',
     };
   }

@@ -70,24 +70,24 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
 
   return (
     <div className="glass-panel rounded-3xl p-4 sm:p-5 border border-teal-500/25 shadow-2xl space-y-3.5 backdrop-blur-2xl">
-      {/* Header: Cukup tulisan "Live Trading" dengan kedip hijau & Modal Awal $500 */}
+      {/* Header: Live Trading with pulse & Portfolio: $500 */}
       <div className="flex items-center justify-between border-b border-teal-500/15 pb-2.5">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-md shadow-emerald-400" />
           <h3 className="font-extrabold text-sm sm:text-base text-white tracking-wide font-mono">
-            Live Trading
+            Live Portfolio
           </h3>
         </div>
 
         <div className="text-right font-mono text-xs text-slate-400">
-          Modal Awal: <strong className="text-white">${INITIAL_CAPITAL.toFixed(2)}</strong>
+          Portfolio: <strong className="text-white">${INITIAL_CAPITAL.toFixed(2)}</strong>
         </div>
       </div>
 
-      {/* Saldo / Equity & Return Metrics */}
+      {/* Equity & Return Metrics */}
       <div className="grid grid-cols-3 gap-2 font-mono">
         <div className="p-2.5 rounded-2xl bg-slate-900/60 border border-teal-500/20">
-          <span className="text-[10px] text-slate-400 block mb-0.5">Saldo / Equity</span>
+          <span className="text-[10px] text-slate-400 block mb-0.5">Equity</span>
           <div className="text-base sm:text-lg font-black text-white tabular-nums tracking-tight">
             ${currentEquity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
@@ -108,7 +108,7 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
         </div>
       </div>
 
-      {/* Posisi Terbuka Saat Ini */}
+      {/* Active Position / Standby status */}
       {runningPosition ? (
         <div className="p-3 rounded-2xl bg-slate-950/60 border border-teal-500/25 space-y-2">
           <div className="flex items-center justify-between">
@@ -165,13 +165,8 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
         <div className="p-3 rounded-2xl bg-slate-950/60 border border-teal-500/15 text-center">
           <div className="text-xs font-mono font-bold text-slate-300">
             {isMarketClosed || selectedAsset === 'XAU/USD'
-              ? 'Pasar XAU/USD Libur · Semua Posisi Flat'
-              : 'Tidak Ada Posisi Terbuka'}
-          </div>
-          <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-            {isMarketClosed || selectedAsset === 'XAU/USD'
-              ? 'Seluruh order ditutup saat akhir pekan demi keamanan modal 100%.'
-              : 'Menunggu pembukaan posisi berikutnya...'}
+              ? 'Market Closed · Flat Positions'
+              : 'No Active Position'}
           </div>
         </div>
       )}

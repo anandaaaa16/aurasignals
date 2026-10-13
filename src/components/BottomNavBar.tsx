@@ -1,5 +1,5 @@
 import React from 'react';
-import { Radio, Calendar, BarChart2 } from 'lucide-react';
+import { Calendar, BarChart2 } from 'lucide-react';
 
 export type NavSection = 'chart' | 'daily_pnl' | 'accuracy';
 
@@ -19,7 +19,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
         {/* Soft internal gradient ambient shine */}
         <div className="absolute inset-0 bg-gradient-to-r from-teal-500/10 via-emerald-500/5 to-cyan-500/10 pointer-events-none" />
 
-        {/* 1. Sinyal Live */}
+        {/* 1. Live Signals */}
         <button
           onClick={() => onSelectSection('chart')}
           className={`relative z-10 flex-1 py-2 px-2 rounded-xl text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1 transition-all cursor-pointer ${
@@ -33,12 +33,12 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
               activeSection === 'chart' ? 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400' : 'bg-slate-500'
             }`}
           />
-          <span className="whitespace-nowrap">Sinyal Live</span>
+          <span className="whitespace-nowrap">Live Signals</span>
         </button>
 
         <div className="w-px h-5 bg-teal-500/20 mx-0.5 shrink-0" />
 
-        {/* 2. Daily PNL (Menu Baru) */}
+        {/* 2. Daily PnL */}
         <button
           onClick={() => onSelectSection('daily_pnl')}
           className={`relative z-10 flex-1 py-2 px-2 rounded-xl text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1 transition-all cursor-pointer ${
@@ -50,12 +50,12 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           <Calendar
             className={`w-3.5 h-3.5 ${activeSection === 'daily_pnl' ? 'text-teal-300' : 'text-slate-400'}`}
           />
-          <span className="whitespace-nowrap">Daily PNL</span>
+          <span className="whitespace-nowrap">Daily PnL</span>
         </button>
 
         <div className="w-px h-5 bg-teal-500/20 mx-0.5 shrink-0" />
 
-        {/* 3. Akurasi Signal */}
+        {/* 3. Performance */}
         <button
           onClick={() => onSelectSection('accuracy')}
           className={`relative z-10 flex-1 py-2 px-2 rounded-xl text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1 transition-all cursor-pointer ${
@@ -67,7 +67,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           <BarChart2
             className={`w-3.5 h-3.5 ${activeSection === 'accuracy' ? 'text-teal-300' : 'text-slate-400'}`}
           />
-          <span className="whitespace-nowrap">Akurasi Signal</span>
+          <span className="whitespace-nowrap">Performance</span>
         </button>
       </div>
     </div>

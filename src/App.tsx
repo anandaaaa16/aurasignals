@@ -374,8 +374,8 @@ export default function App() {
             action: isBuy ? 'BUY' : 'SELL',
             confidence: sig.confidencePercent || 88.5,
             setupRationale: isWin
-              ? `Target tercapai mulus (+${Math.abs(pnlPips)} ${isGold ? 'pips' : 'pts'}). Setup terbukti valid sesuai proyeksi ekspansi likuiditas.`
-              : `Batas invalidasi tersentuh (-${Math.abs(pnlPips)} ${isGold ? 'pips' : 'pts'}). Hard Stop Loss berhasil memproteksi modal sesuai aturan 1.5% max risk.`,
+              ? `Target hit cleanly (+${Math.abs(pnlPips)} ${isGold ? 'pips' : 'pts'}). Setup validated according to projected liquidity expansion.`
+              : `Invalidation reached (-${Math.abs(pnlPips)} ${isGold ? 'pips' : 'pts'}). Hard Stop Loss protected trading capital under 1.5% max risk rule.`,
             riskGuard: {
               maxCapitalRiskDollar: isGold ? Math.abs(diff) * 5 : Math.abs(diff) * 0.02,
               riskPercent: 1.5,
@@ -409,9 +409,9 @@ export default function App() {
 
         // Toast Alert
         if (isWin) {
-          showToast(`🎯 ${asset} HIT TP! (+${Math.abs(pnlPips)} ${isGold ? 'pips' : 'pts'}). Sinyal baru dibuka!`);
+          showToast(`🎯 ${asset} HIT TP! (+${Math.abs(pnlPips)} ${isGold ? 'pips' : 'pts'}). New signal active!`);
         } else {
-          showToast(`🛑 ${asset} HIT SL! (-${Math.abs(pnlPips)} ${isGold ? 'pips' : 'pts'}). Sinyal baru dibuka!`);
+          showToast(`🛑 ${asset} HIT SL! (-${Math.abs(pnlPips)} ${isGold ? 'pips' : 'pts'}). New signal active!`);
         }
 
         // Open fresh H1 signal for this asset (ONLY if market is open AND bot is running!)
@@ -424,7 +424,7 @@ export default function App() {
         if (!isBotRunning) {
           activeSignalsRef.current[asset] = null;
           setActiveSignals({ ...activeSignalsRef.current });
-          showToast(`Trading Bot AI sedang dihentikan oleh Admin.`);
+          showToast(`AI Trading Bot paused by Admin.`);
           return;
         }
 
@@ -525,13 +525,13 @@ export default function App() {
     if (!sig) return;
     const targetPrice = hitType === 'HIT_TP' ? sig.takeProfit[0].price : sig.stopLoss.price;
     handleIncomingPrice(asset, targetPrice);
-    showToast(`Posisi ${asset} berhasil di-close oleh Admin (${hitType}).`);
+    showToast(`Position ${asset} force closed by Admin (${hitType}).`);
   };
 
   const handleAddManualSignal = (newSignal: SignalData) => {
     activeSignalsRef.current[newSignal.asset] = newSignal;
     setActiveSignals({ ...activeSignalsRef.current });
-    showToast(`Sinyal manual ${newSignal.asset} (${newSignal.signal}) berhasil diterbitkan.`);
+    showToast(`Manual signal ${newSignal.asset} (${newSignal.signal}) published.`);
   };
 
   const handleResetAllHistory = () => {
@@ -542,7 +542,7 @@ export default function App() {
       localStorage.removeItem('aurasignals_ai_journals');
     } catch (e) {}
     clearAllTradesInCloud().catch(() => {});
-    showToast('Semua riwayat trading telah dibersihkan (Fresh Start 0 Trade).');
+    showToast('All trade history cleared (Fresh Start 0 Trades).');
   };
 
   // Current active signal for selected asset (strictly null if Gold market is closed!)
@@ -576,10 +576,10 @@ export default function App() {
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400" />
             <span>
               {activeSection === 'chart'
-                ? 'AURASIGNALS · LIVE POSISI (H1)'
+                ? 'AURASIGNALS · LIVE SIGNALS (H1)'
                 : activeSection === 'daily_pnl'
-                ? 'AURASIGNALS · REKAP DAILY PNL'
-                : 'AURASIGNALS · AKURASI SIGNAL'}
+                ? 'AURASIGNALS · DAILY PNL'
+                : 'AURASIGNALS · PERFORMANCE'}
             </span>
           </div>
 
@@ -589,10 +589,10 @@ export default function App() {
               <button
                 onClick={() => setIsAdminModalOpen(true)}
                 className="flex items-center gap-1 px-2 py-0.5 rounded-xl text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-all cursor-pointer shadow-sm shadow-amber-500/20"
-                title="Buka Admin Control Panel"
+                title="Open Admin Control Panel"
               >
                 <Sliders className="w-3 h-3 text-amber-400" />
-                <span>PANEL ADMIN</span>
+                <span>ADMIN PANEL</span>
               </button>
             )}
 
@@ -606,7 +606,7 @@ export default function App() {
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-500/20'
                   : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'
               }`}
-              title="Akses PIN 6-Digit"
+              title="Access PIN"
             >
               {userRole === 'ADMIN' ? (
                 <>
@@ -621,7 +621,7 @@ export default function App() {
               ) : (
                 <>
                   <KeyRound className="w-3 h-3 text-teal-400" />
-                  <span>KODE PIN</span>
+                  <span>ENTER PIN</span>
                 </>
               )}
             </button>
@@ -629,7 +629,7 @@ export default function App() {
             <button
               onClick={() => {
                 setSoundEnabled(!soundEnabled);
-                showToast(!soundEnabled ? 'Suara aktif' : 'Suara nonaktif');
+                showToast(!soundEnabled ? 'Sound enabled' : 'Sound disabled');
               }}
               className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
               title="Toggle Sound"
@@ -642,13 +642,13 @@ export default function App() {
         {/* Bot Paused Banner (if Admin paused the bot) */}
         {!isBotRunning && (
           <div className="p-2.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-mono font-bold flex items-center justify-between animate-pulse">
-            <span>⚠️ TRADING BOT AI DIHENTIKAN OLEH ADMIN</span>
+            <span>⚠️ AI TRADING BOT PAUSED BY ADMIN</span>
             {userRole === 'ADMIN' && (
               <button
                 onClick={() => setIsAdminModalOpen(true)}
                 className="underline hover:text-white cursor-pointer text-[11px]"
               >
-                Mulai Bot
+                Resume Bot
               </button>
             )}
           </div>
@@ -672,7 +672,7 @@ export default function App() {
             {/* 2. Sinyal Aktif Card & AI Trade Journal Card (BLURRED UNTUK GUEST, UNLOCKED UNTUK VIP & ADMIN) */}
             {userRole === 'GUEST' ? (
               <div className="relative">
-                <div className="space-y-3 filter blur-md select-none pointer-events-none opacity-40">
+                <div className="space-y-3 filter blur-[7px] select-none pointer-events-none opacity-60">
                   <TpProgressCard
                     signal={activeSignal}
                     currentPrice={currentPrice}

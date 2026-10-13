@@ -23,15 +23,15 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
         </div>
         <div className="space-y-1">
           <h3 className="font-extrabold text-sm text-white font-mono tracking-wide">
-            PASAR XAU/USD LIBUR (AKHIR PEKAN)
+            MARKET CLOSED · WEEKEND
           </h3>
           <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
-            Bursa emas internasional tutup saat weekend. Seluruh transaksi di-close dan tidak ada posisi dibuka. Sinyal baru otomatis aktif kembali saat pasar buka (Senin 05:00 WIB).
+            Global spot gold market is closed for the weekend. All positions closed flat with zero risk. Signals resume Monday 00:00 UTC.
           </p>
         </div>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] font-mono text-amber-300 font-bold">
           <span className="w-2 h-2 rounded-full bg-amber-400" />
-          <span>Status: Semua Posisi Flat (Zero Exposure)</span>
+          <span>Status: Flat (Zero Exposure)</span>
         </div>
       </div>
     );
@@ -40,7 +40,7 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
   if (!signal || !currentPrice) {
     return (
       <div className="p-5 glass-panel rounded-3xl text-center text-slate-400">
-        <p className="text-xs">Memuat sinyal posisi aktif...</p>
+        <p className="text-xs">Loading active signals...</p>
       </div>
     );
   }
@@ -115,7 +115,7 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
               </span>
               <span className="flex items-center gap-1 text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20">
                 <Radio className="w-2 h-2 animate-pulse" />
-                POSISI AKTIF
+                ACTIVE POSITION
               </span>
             </div>
 
@@ -160,7 +160,7 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
         <div className="flex items-center justify-between text-xs font-mono">
           <div className="flex items-center gap-1.5 text-slate-300">
             <Target className="w-3.5 h-3.5 text-teal-400" />
-            <span className="font-semibold text-slate-200">Progres Menuju TP</span>
+            <span className="font-semibold text-slate-200">Progress to TP</span>
           </div>
           <span className="text-emerald-400 font-bold font-mono">
             {progressPercent}%
@@ -180,19 +180,19 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
         <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-0.5">
           <span className="flex items-center gap-1 text-teal-300">
             <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-            <span>Jarak {distToTpPips} {isGold ? 'pips' : 'pts'} ke TP</span>
+            <span>{distToTpPips} {isGold ? 'pips' : 'pts'} to TP</span>
           </span>
           <span className="flex items-center gap-1 text-rose-400/80">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-            <span>Jarak {distToSlPips} {isGold ? 'pips' : 'pts'} ke SL</span>
+            <span>{distToSlPips} {isGold ? 'pips' : 'pts'} to SL</span>
           </span>
         </div>
       </div>
 
-      {/* 3. Target Level Cards: CUKUP 1 TP & 1 SL */}
+      {/* 3. Target Level Cards: 1 TP & 1 SL (Clean without clutter text) */}
       <div className="grid grid-cols-2 gap-2.5 pt-1">
         <div className="p-3 glass-panel-subtle rounded-2xl text-left border border-emerald-500/30 bg-emerald-500/5">
-          <div className="text-[10px] text-emerald-400 font-bold uppercase flex items-center justify-between mb-0.5">
+          <div className="text-[10px] text-emerald-400 font-bold uppercase flex items-center justify-between mb-1">
             <span className="flex items-center gap-1">
               <Target className="w-3 h-3 text-emerald-400" />
               <span>TAKE PROFIT (TP)</span>
@@ -204,13 +204,10 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
           <div className="text-base font-extrabold font-mono text-emerald-300 tabular-nums">
             ${signal.takeProfit[0]?.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-            Tutup otomatis saat tersentuh
-          </div>
         </div>
 
         <div className="p-3 glass-panel-subtle rounded-2xl text-left border border-rose-500/30 bg-rose-500/5">
-          <div className="text-[10px] text-rose-400 font-bold uppercase flex items-center justify-between mb-0.5">
+          <div className="text-[10px] text-rose-400 font-bold uppercase flex items-center justify-between mb-1">
             <span className="flex items-center gap-1">
               <ShieldAlert className="w-3 h-3 text-rose-400" />
               <span>STOP LOSS (SL)</span>
@@ -221,9 +218,6 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
           </div>
           <div className="text-base font-extrabold font-mono text-rose-300 tabular-nums">
             ${slPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-            Batas pengaman modal
           </div>
         </div>
       </div>

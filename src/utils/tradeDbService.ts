@@ -121,7 +121,7 @@ export function verifySixDigitCode(code: string): { success: boolean; role: 'ADM
     return {
       success: true,
       role: 'ADMIN',
-      message: 'Akses Admin Terverifikasi (Full Control & Bot Management)',
+      message: 'Admin Access Verified (Full Control & Bot Management)',
     };
   }
 
@@ -131,13 +131,13 @@ export function verifySixDigitCode(code: string): { success: boolean; role: 'ADM
     return {
       success: true,
       role: 'MEMBER',
-      message: 'Akses VIP Member Aktif (Semua Sinyal Unlocked)',
+      message: 'VIP Member Access Active (All Signals Unlocked)',
     };
   }
 
   return {
     success: false,
     role: 'GUEST',
-    message: 'Kode 6-Digit Tidak Valid. Hubungi Admin untuk Kode VIP.',
+    message: 'Invalid 6-Digit PIN. Contact Admin for VIP Access.',
   };
 }

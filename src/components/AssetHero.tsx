@@ -35,17 +35,17 @@ export const AssetHero: React.FC<AssetHeroProps> = ({
           </h1>
 
           <span className="text-[11px] font-semibold text-teal-300/90 bg-teal-950/60 border border-teal-500/20 px-2 py-0.5 rounded-lg">
-            {selectedAsset === 'BTC/USDT' ? 'Bitcoin' : 'Gold (Emas)'}
+            {selectedAsset === 'BTC/USDT' ? 'Bitcoin' : 'Spot Gold'}
           </span>
 
           {isMarketClosed && (
             <span className="text-[10px] font-mono text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md font-semibold">
-              Libur Akhir Pekan
+              Weekend Closure
             </span>
           )}
         </div>
 
-        {/* Asset Switcher (BTC / XAU) */}
+        {/* Asset Switcher (BTC / GOLD) */}
         <div className="inline-flex p-0.5 bg-[#021317]/90 border border-teal-500/25 rounded-xl shadow-inner">
           <button
             onClick={() => onSelectAsset('BTC/USDT')}
@@ -65,12 +65,12 @@ export const AssetHero: React.FC<AssetHeroProps> = ({
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            XAU (Emas)
+            GOLD
           </button>
         </div>
       </div>
 
-      {/* Giant Main Price: 1-Second Dynamic Tick Flash (Kedip Hijau / Merah) */}
+      {/* Giant Main Price: 1-Second Dynamic Tick Flash */}
       <div className="my-0.5">
         <div
           className={`inline-block font-mono text-3xl sm:text-5xl font-black tracking-tight tabular-nums px-2 py-0.5 -mx-2 rounded-xl transition-all duration-300 ${
@@ -88,7 +88,7 @@ export const AssetHero: React.FC<AssetHeroProps> = ({
         </div>
       </div>
 
-      {/* 24h & High/Low Subtitle line (Compact & mepet ke chart) */}
+      {/* 24h & High/Low Subtitle */}
       <div className="flex items-center gap-1.5 text-xs font-mono text-slate-400 mb-1">
         <span className={isUp ? 'text-emerald-400' : 'text-rose-400'}>
           {isUp ? '↗' : '↘'}

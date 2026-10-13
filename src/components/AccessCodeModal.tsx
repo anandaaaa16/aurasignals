@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, KeyRound, Crown, UserCheck, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { KeyRound, Crown, UserCheck, X, CheckCircle, AlertCircle } from 'lucide-react';
 import { verifySixDigitCode, UserRoleSession } from '../utils/tradeDbService';
 
 interface AccessCodeModalProps {
@@ -87,16 +87,16 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
 
           <h2 className="text-lg font-black font-mono text-white tracking-wide">
             {currentRole === 'ADMIN'
-              ? 'Mode Admin Aktif'
+              ? 'Admin Access Active'
               : currentRole === 'MEMBER'
-              ? 'Mode VIP Member'
-              : 'Verifikasi Kode 6-Digit'}
+              ? 'VIP Access Active'
+              : 'Enter Access Code'}
           </h2>
 
           <p className="text-xs text-slate-400 font-sans">
             {currentRole !== 'GUEST'
-              ? 'Anda saat ini memiliki izin akses khusus ke sistem.'
-              : 'Masukkan 6 digit kode PIN untuk membuka hak akses Admin atau Member.'}
+              ? 'You currently have elevated system privileges.'
+              : 'Enter your 6-digit PIN code to unlock VIP or Admin access.'}
           </p>
         </div>
 
@@ -104,13 +104,13 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
         {currentRole !== 'GUEST' && (
           <div className="p-3 rounded-2xl bg-slate-950/70 border border-teal-500/20 text-center space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-teal-500/10 border border-teal-500/25 text-xs font-mono font-bold text-teal-300">
-              {currentRole === 'ADMIN' ? '👑 Status: Super Admin' : '⭐ Status: VIP Member'}
+              {currentRole === 'ADMIN' ? '👑 Status: Master Admin' : '⭐ Status: VIP Member'}
             </div>
             <button
               onClick={handleLogout}
               className="block w-full py-2 text-xs font-mono text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer font-bold"
             >
-              Keluar / Beralih ke Mode Publik (Guest)
+              Sign Out to Guest Mode
             </button>
           </div>
         )}
@@ -176,13 +176,13 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
                 onClick={handleBackspace}
                 className="py-3 rounded-2xl bg-slate-900/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 font-bold text-sm border border-white/5 hover:border-rose-500/30 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
               >
-                Hapus
+                DEL
               </button>
             </div>
 
             <div className="text-center pt-1">
               <span className="text-[10px] text-slate-500 font-mono">
-                PIN Admin Default: <strong className="text-teal-400">889900</strong> · VIP Member: <strong className="text-teal-400">777888</strong>
+                Admin: <strong className="text-teal-400">889900</strong> · VIP Member: <strong className="text-teal-400">777888</strong>
               </span>
             </div>
           </div>
