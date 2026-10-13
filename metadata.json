@@ -1,0 +1,6 @@
+{
+  "name": "AuraSignals - Sinyal Prediksi XAU/USD & BTC",
+  "description": "Terminal analisis teknikal dan sinyal prediksi real-time untuk Gold (XAU/USD) dan Bitcoin (BTC/USDT) bertenaga AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
