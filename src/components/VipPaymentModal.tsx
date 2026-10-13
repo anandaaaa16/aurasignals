@@ -62,8 +62,8 @@ export const VipPaymentModal: React.FC<VipPaymentModalProps> = ({
   };
 
   const usdtAddresses = {
-    TRC20: 'TYDNh6C8Z8xP2Z9Vj9k5M8P1Q4K9X2J5A7',
-    BEP20: '0x71C8a5d3f2e14B829c9E75691FdBc84d7F1A88D2',
+    TRC20: 'TDdQKPp5ASuQcVsrx8S7WvfTSmbyP6cfe9',
+    BEP20: '0x77dD23FE65ABc031d5A73721ABa3caEeC67B8f18',
   };
 
   const handleCopy = (text: string) => {
