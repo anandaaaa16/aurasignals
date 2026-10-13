@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "ClosedTrade": {
+      "title": "ClosedTrade",
+      "description": "Historical closed trade transaction recorded by the signal engine",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "asset": { "type": "string", "enum": ["BTC/USDT", "XAU/USD"] },
+        "direction": { "type": "string", "enum": ["BUY", "SELL"] },
+        "entryPrice": { "type": "number" },
+        "exitPrice": { "type": "number" },
+        "hitType": { "type": "string", "enum": ["HIT_TP", "HIT_SL"] },
+        "pnlPercent": { "type": "number" },
+        "pnlPips": { "type": "number" },
+        "dateStr": { "type": "string", "maxLength": 32 },
+        "timeStr": { "type": "string", "maxLength": 32 },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "asset", "direction", "entryPrice", "exitPrice", "hitType", "pnlPercent", "timestamp"]
+    },
+    "AiJournal": {
+      "title": "AiJournal",
+      "description": "24/7 AI Autonomous trade journal entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "asset": { "type": "string", "enum": ["BTC/USDT", "XAU/USD"] },
+        "action": { "type": "string", "enum": ["BUY", "SELL", "HOLD"] },
+        "confidence": { "type": "number" },
+        "setupRationale": { "type": "string", "maxLength": 1000 },
+        "timeStr": { "type": "string", "maxLength": 32 },
+        "timestamp": { "type": "number" },
+        "outcomeNote": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["id", "asset", "action", "setupRationale", "timestamp"]
+    },
+    "AccessRole": {
+      "title": "AccessRole",
+      "description": "Admin and VIP member authentication codes and system parameters",
+      "type": "object",
+      "properties": {
+        "adminPin": { "type": "string", "maxLength": 6 },
+        "vipCodes": { "type": "array" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["adminPin"]
+    }
+  },
+  "firestore": {
+    "/closedTrades/{tradeId}": {
+      "schema": { "$ref": "#/entities/ClosedTrade" },
+      "description": "Global transparent historical closed trades for accurate win rate and PnL"
+    },
+    "/aiJournals/{journalId}": {
+      "schema": { "$ref": "#/entities/AiJournal" },
+      "description": "AI Trading Agent decision logs and audit trail"
+    },
+    "/accessConfig/{configId}": {
+      "schema": { "$ref": "#/entities/AccessRole" },
+      "description": "6-digit access codes for Admin and VIP members"
+    }
+  }
+}

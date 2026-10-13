@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidTrade(data) {
+      return data.keys().hasAll(['id', 'asset', 'direction', 'entryPrice', 'exitPrice', 'hitType', 'pnlPercent', 'timestamp'])
+        && data.id is string && data.id.size() <= 128
+        && data.asset in ['BTC/USDT', 'XAU/USD']
+        && data.direction in ['BUY', 'SELL']
+        && data.hitType in ['HIT_TP', 'HIT_SL']
+        && data.entryPrice is number
+        && data.exitPrice is number
+        && data.pnlPercent is number
+        && data.timestamp is number;
+    }
+
+    function isValidJournal(data) {
+      return data.keys().hasAll(['id', 'asset', 'action', 'setupRationale', 'timestamp'])
+        && data.id is string && data.id.size() <= 128
+        && data.asset in ['BTC/USDT', 'XAU/USD']
+        && data.action in ['BUY', 'SELL', 'HOLD']
+        && data.setupRationale is string && data.setupRationale.size() <= 1000
+        && data.timestamp is number;
+    }
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 1. Closed Trades: Public read for transparency, validated write
+    match /closedTrades/{tradeId} {
+      allow read: if isValidId(tradeId);
+      allow create: if isValidId(tradeId) && isValidTrade(incoming());
+      allow update: if isValidId(tradeId) && isValidTrade(incoming());
+      allow delete: if isValidId(tradeId);
+    }
+
+    // 2. AI Trade Journals: Public read for research & audit trail
+    match /aiJournals/{journalId} {
+      allow read: if isValidId(journalId);
+      allow create: if isValidId(journalId) && isValidJournal(incoming());
+      allow update: if isValidId(journalId) && isValidJournal(incoming());
+      allow delete: if isValidId(journalId);
+    }
+
+    // 3. Access Role & 6-Digit PIN Configurations
+    match /accessConfig/{configId} {
+      allow read: if isValidId(configId);
+      allow write: if isValidId(configId) && incoming().adminPin is string && incoming().adminPin.size() <= 6;
+    }
+  }
+}

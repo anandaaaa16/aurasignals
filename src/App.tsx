@@ -11,9 +11,16 @@ import { OwnerLivePortfolio } from './components/OwnerLivePortfolio';
 import { DailyPnlView } from './components/DailyPnlView';
 import { BottomNavBar, NavSection } from './components/BottomNavBar';
 import { AiTradeJournalCard } from './components/AiTradeJournalCard';
+import { AccessCodeModal } from './components/AccessCodeModal';
 import { generateLiveJournalEntry, INITIAL_AI_JOURNALS } from './utils/aiTradingAgent';
+import {
+  subscribeToClosedTrades,
+  saveClosedTradeToCloud,
+  saveJournalEntryToCloud,
+  testFirestoreConnection,
+} from './utils/tradeDbService';
 import { AiTradeJournalEntry } from './types';
-import { Sparkles, Bell, BellOff } from 'lucide-react';
+import { Sparkles, Bell, BellOff, KeyRound, Crown, UserCheck } from 'lucide-react';
 
 const DEFAULT_BTC: MarketTicker = {
   symbol: 'BTC/USDT',
@@ -113,6 +120,27 @@ export default function App() {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
+
+  // 6-DIGIT ACCESS ROLE: Guest vs Member vs Admin
+  const [userRole, setUserRole] = useState<'GUEST' | 'MEMBER' | 'ADMIN'>(() => {
+    try {
+      const saved = localStorage.getItem('aurasignals_user_role');
+      if (saved === 'ADMIN' || saved === 'MEMBER') return saved;
+    } catch (e) {}
+    return 'GUEST';
+  });
+  const [isAccessModalOpen, setIsAccessModalOpen] = useState<boolean>(false);
+
+  // REAL-TIME FIRESTORE SYNC: Synchronize closed trades across all devices
+  useEffect(() => {
+    testFirestoreConnection();
+    const unsubscribe = subscribeToClosedTrades((remoteTrades) => {
+      if (remoteTrades && remoteTrades.length > 0) {
+        setClosedTrades(remoteTrades);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // 1-second Gold tick fetcher (supports Cloud, GitHub Pages, & public exchange feeds)
   const fetchXauData = useCallback(async () => {
@@ -334,6 +362,9 @@ export default function App() {
           return updated;
         });
 
+        // Persist to Firebase Firestore (Real-Time Cloud Synchronization!)
+        saveClosedTradeToCloud(closedTradeItem);
+
         // Record to AI Trade Journal Audit Trail (MindStudio Pattern)
         if (sig) {
           const completedJournal: AiTradeJournalEntry = {
@@ -369,6 +400,9 @@ export default function App() {
             } catch (e) {}
             return updatedJournals;
           });
+
+          // Persist journal entry to Firebase Firestore
+          saveJournalEntryToCloud(completedJournal);
         }
 
         // Audio Alert
@@ -513,16 +547,48 @@ export default function App() {
             </span>
           </div>
 
-          <button
-            onClick={() => {
-              setSoundEnabled(!soundEnabled);
-              showToast(!soundEnabled ? 'Suara aktif' : 'Suara nonaktif');
-            }}
-            className="p-1.5 text-slate-400 hover:text-white transition-colors cursor-pointer"
-            title="Toggle Sound"
-          >
-            {soundEnabled ? <Bell className="w-3.5 h-3.5 text-teal-400" /> : <BellOff className="w-3.5 h-3.5" />}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* 6-Digit Access PIN Button */}
+            <button
+              onClick={() => setIsAccessModalOpen(true)}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-xl text-[10px] font-mono font-bold transition-all cursor-pointer ${
+                userRole === 'ADMIN'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm shadow-amber-500/20'
+                  : userRole === 'MEMBER'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-500/20'
+                  : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'
+              }`}
+              title="Akses PIN 6-Digit"
+            >
+              {userRole === 'ADMIN' ? (
+                <>
+                  <Crown className="w-3 h-3 text-amber-400" />
+                  <span>ADMIN</span>
+                </>
+              ) : userRole === 'MEMBER' ? (
+                <>
+                  <UserCheck className="w-3 h-3 text-emerald-400" />
+                  <span>VIP</span>
+                </>
+              ) : (
+                <>
+                  <KeyRound className="w-3 h-3 text-teal-400" />
+                  <span>KODE PIN</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                setSoundEnabled(!soundEnabled);
+                showToast(!soundEnabled ? 'Suara aktif' : 'Suara nonaktif');
+              }}
+              className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              title="Toggle Sound"
+            >
+              {soundEnabled ? <Bell className="w-3.5 h-3.5 text-teal-400" /> : <BellOff className="w-3.5 h-3.5" />}
+            </button>
+          </div>
         </div>
 
         {/* TAB 1: Sinyal Live (Header BTC/XAU, Chart Simpel Elegan H1 + 1 TP & SL + Akun Live Owner) */}
@@ -586,6 +652,26 @@ export default function App() {
       <BottomNavBar
         activeSection={activeSection}
         onSelectSection={(sec) => setActiveSection(sec)}
+      />
+
+      {/* 6-Digit PIN Modal for Admin & VIP Member Access */}
+      <AccessCodeModal
+        isOpen={isAccessModalOpen}
+        onClose={() => setIsAccessModalOpen(false)}
+        currentRole={userRole}
+        onRoleChange={(newRole) => {
+          setUserRole(newRole);
+          try {
+            localStorage.setItem('aurasignals_user_role', newRole);
+          } catch (e) {}
+          showToast(
+            newRole === 'ADMIN'
+              ? '👑 Login Admin Berhasil!'
+              : newRole === 'MEMBER'
+              ? '⭐ Akses VIP Member Aktif!'
+              : 'Beralih ke mode Guest.'
+          );
+        }}
       />
     </div>
   );
