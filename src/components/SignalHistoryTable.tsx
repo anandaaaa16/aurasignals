@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ClosedTrade, AssetSymbol } from '../types';
+import { ClosedTrade, AssetSymbol, calculateTradeGain } from '../types';
 import { Trophy, CheckCircle2, XCircle, ArrowUpRight, ArrowDownRight, Calendar } from 'lucide-react';
 import { WavePlaybackChart } from './WavePlaybackChart';
 
@@ -34,10 +34,10 @@ export const SignalHistoryTable: React.FC<SignalHistoryTableProps> = ({ trades }
     const losses = filteredTrades.filter((t) => t.hitType === 'HIT_SL').length;
     const winRate = total > 0 ? Math.round((wins / total) * 1000) / 10 : 85.7;
 
-    const netPercent = Math.round(filteredTrades.reduce((acc, t) => acc + t.pnlPercent, 0) * 100) / 100;
-    const netPips = filteredTrades.reduce((acc, t) => acc + t.pnlPips, 0);
+    const netDollar = Math.round(filteredTrades.reduce((acc, t) => acc + calculateTradeGain(t), 0) * 100) / 100;
+    const netReturnPercent = Math.round((netDollar / 500) * 100 * 10) / 10;
 
-    return { total, wins, losses, winRate, netPercent, netPips };
+    return { total, wins, losses, winRate, netDollar, netReturnPercent };
   }, [filteredTrades]);
 
   const getDateLabel = (dStr: string) => {
@@ -91,7 +91,7 @@ export const SignalHistoryTable: React.FC<SignalHistoryTableProps> = ({ trades }
           <div>
             <div className="text-[10px] uppercase font-mono tracking-wider text-slate-400 font-semibold flex items-center gap-1.5">
               <Trophy className="w-3.5 h-3.5 text-amber-400" />
-              <span>Signal Performance {selectedDate === 'ALL' ? '(All Time)' : `(${getDateLabel(selectedDate)})`}</span>
+              <span>Futures Performance {selectedDate === 'ALL' ? '(All Time)' : `(${getDateLabel(selectedDate)})`}</span>
             </div>
             <div className="text-2xl sm:text-3xl font-black font-mono text-emerald-400 tracking-tight mt-0.5">
               {stats.winRate}% <span className="text-xs sm:text-sm font-semibold text-slate-300">Win Rate</span>
@@ -100,13 +100,13 @@ export const SignalHistoryTable: React.FC<SignalHistoryTableProps> = ({ trades }
 
           <div className="text-right font-mono">
             <div className="text-[10px] uppercase font-mono tracking-wider text-slate-400 font-semibold">
-              Net Return
+              Net Profit
             </div>
-            <div className={`text-lg sm:text-xl font-black ${stats.netPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {stats.netPercent >= 0 ? '+' : ''}{stats.netPercent}%
+            <div className={`text-lg sm:text-xl font-black ${stats.netDollar >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {stats.netDollar >= 0 ? '+' : '-'}${Math.abs(stats.netDollar).toFixed(2)}
             </div>
-            <div className="text-[10px] text-slate-400">
-              {stats.netPips >= 0 ? '+' : ''}{stats.netPips} pips/pts
+            <div className={`text-[10px] font-bold ${stats.netReturnPercent >= 0 ? 'text-emerald-400/90' : 'text-rose-400/90'}`}>
+              {stats.netReturnPercent >= 0 ? '+' : ''}{stats.netReturnPercent}% Return (10x Futures)
             </div>
           </div>
         </div>
@@ -140,7 +140,7 @@ export const SignalHistoryTable: React.FC<SignalHistoryTableProps> = ({ trades }
       {/* Asset Filter Pill Strip */}
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-mono text-slate-400 font-semibold">
-          Trade Log ({filteredTrades.length} Trades)
+          Trade Log ({filteredTrades.length} Positions)
         </span>
         <div className="flex items-center gap-1 bg-slate-900/60 p-0.5 rounded-lg border border-white/10 text-[10px] font-mono">
           <button
@@ -194,6 +194,8 @@ export const SignalHistoryTable: React.FC<SignalHistoryTableProps> = ({ trades }
           filteredTrades.map((t) => {
             const isWin = t.hitType === 'HIT_TP';
             const isBuy = t.direction === 'BUY';
+            const dollarGain = calculateTradeGain(t);
+            const roeVal = t.roePercent !== undefined ? t.roePercent : t.pnlPercent * 10;
             return (
               <div
                 key={t.id}
@@ -218,7 +220,7 @@ export const SignalHistoryTable: React.FC<SignalHistoryTableProps> = ({ trades }
                       <div className="flex items-center gap-1.5">
                         <span className="font-bold text-xs text-white">{t.asset}</span>
                         <span className="text-[10px] font-mono text-slate-400 font-bold bg-white/5 px-1 rounded">
-                          {t.direction}
+                          {isBuy ? 'LONG' : 'SHORT'} 10x
                         </span>
                       </div>
                       <div className="text-[10px] text-slate-400 font-mono">
@@ -241,12 +243,12 @@ export const SignalHistoryTable: React.FC<SignalHistoryTableProps> = ({ trades }
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-end gap-1 mt-0.5">
+                    <div className="flex items-center justify-end gap-1.5 mt-0.5">
                       <span className={`text-xs font-black ${isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {t.pnlPercent >= 0 ? '+' : ''}{t.pnlPercent.toFixed(2)}%
+                        {dollarGain >= 0 ? '+' : '-'}${Math.abs(dollarGain).toFixed(2)}
                       </span>
-                      <span className="text-[10px] text-slate-400">
-                        ({t.pnlPips >= 0 ? '+' : ''}{t.pnlPips} pts)
+                      <span className={`text-[10px] font-bold ${isWin ? 'text-emerald-400/80' : 'text-rose-400/80'}`}>
+                        ({roeVal >= 0 ? '+' : ''}{roeVal.toFixed(1)}% ROE)
                       </span>
                     </div>
                   </div>

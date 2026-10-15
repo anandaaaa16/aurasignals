@@ -5,12 +5,11 @@ import {
   CheckCircle,
   Copy,
   Check,
-  QrCode,
   Coins,
-  MessageSquare,
-  ShieldCheck,
   Send,
   Zap,
+  ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 import { VipPaymentRequest } from '../types';
 import { submitVipPaymentRequest } from '../utils/tradeDbService';
@@ -27,9 +26,8 @@ export const VipPaymentModal: React.FC<VipPaymentModalProps> = ({
   onOpenAccessModal,
 }) => {
   const [selectedPlan, setSelectedPlan] = useState<'1_MONTH' | '3_MONTHS' | 'LIFETIME'>('3_MONTHS');
-  const [paymentMethod, setPaymentMethod] = useState<'QRIS' | 'USDT'>('QRIS');
   const [usdtNetwork, setUsdtNetwork] = useState<'TRC20' | 'BEP20'>('TRC20');
-  const [copied, setCopied] = useState(false);
+  const [copiedNetwork, setCopiedNetwork] = useState<string | null>(null);
 
   // Form states
   const [userName, setUserName] = useState('');
@@ -43,19 +41,16 @@ export const VipPaymentModal: React.FC<VipPaymentModalProps> = ({
   const plans = {
     '1_MONTH': {
       title: '1 Month Access',
-      idr: 'Rp 199.000',
       usdt: '$15 USDT',
       tag: 'Flexible',
     },
     '3_MONTHS': {
       title: '3 Months VIP Pass',
-      idr: 'Rp 499.000',
       usdt: '$35 USDT',
-      tag: 'Best Value · 17% OFF',
+      tag: 'Best Value · 22% OFF',
     },
     LIFETIME: {
       title: 'Lifetime Unlimited',
-      idr: 'Rp 1.299.000',
       usdt: '$89 USDT',
       tag: 'One-Time · VIP Lounge',
     },
@@ -66,24 +61,25 @@ export const VipPaymentModal: React.FC<VipPaymentModalProps> = ({
     BEP20: '0x77dD23FE65ABc031d5A73721ABa3caEeC67B8f18',
   };
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = (networkKey: 'TRC20' | 'BEP20', address: string) => {
+    navigator.clipboard.writeText(address);
+    setCopiedNetwork(networkKey);
+    setTimeout(() => setCopiedNetwork(null), 2500);
   };
 
   const currentPlan = plans[selectedPlan];
-  const targetAmount = paymentMethod === 'QRIS' ? currentPlan.idr : currentPlan.usdt;
+  const targetAmount = currentPlan.usdt;
 
   const handleWhatsAppConfirm = () => {
     const text = encodeURIComponent(
-      `Halo Admin AuraSignals! Saya ingin konfirmasi pembayaran VIP Membership:\n` +
-      `• Paket: ${currentPlan.title}\n` +
-      `• Metode: ${paymentMethod} (${targetAmount})\n` +
-      `• Nama: ${userName || 'Member'}\n` +
-      `• No Kontak: ${userContact || '-'}\n` +
-      `• Bukti/Ref: ${txRef || 'Sudah transfer'}\n\n` +
-      `Mohon verifikasi dan kirimkan 6-digit PIN VIP saya. Terima kasih!`
+      `Halo Admin AuraSignals! Saya telah menyelesaikan transfer USDT untuk VIP Membership:\n\n` +
+      `• Paket: ${currentPlan.title} (${targetAmount})\n` +
+      `• Jaringan: ${usdtNetwork === 'TRC20' ? 'USDT TRC-20 (Tron)' : 'USDT BEP-20 (BSC)'}\n` +
+      `• Alamat Penerima: ${usdtAddresses[usdtNetwork]}\n` +
+      `• Nama Member: ${userName || 'Trader'}\n` +
+      `• Kontak / WA: ${userContact || '-'}\n` +
+      `• TxID / Hash: ${txRef || 'Sudah transfer'}\n\n` +
+      `Mohon verifikasi dan aktifkan 6-digit VIP PIN saya. Terima kasih!`
     );
     window.open(`https://wa.me/6281234567890?text=${text}`, '_blank');
   };
@@ -98,10 +94,10 @@ export const VipPaymentModal: React.FC<VipPaymentModalProps> = ({
       userName: userName.trim(),
       contact: userContact.trim(),
       plan: selectedPlan,
-      method: paymentMethod === 'QRIS' ? 'QRIS' : usdtNetwork === 'TRC20' ? 'USDT_TRC20' : 'USDT_BEP20',
+      method: usdtNetwork === 'TRC20' ? 'USDT_TRC20' : 'USDT_BEP20',
       amount: targetAmount,
       status: 'PENDING',
-      txProofOrRef: txRef.trim() || 'Payment completed',
+      txProofOrRef: txRef.trim() || 'USDT transfer completed',
       createdAt: Date.now(),
     };
 
@@ -130,10 +126,10 @@ export const VipPaymentModal: React.FC<VipPaymentModalProps> = ({
           </div>
 
           <h2 className="text-xl font-black font-mono text-white tracking-wide">
-            Upgrade to VIP Member
+            Upgrade to VIP Member (USDT)
           </h2>
           <p className="text-xs text-slate-400 font-sans">
-            Unlock real-time institutional signals, precise entry levels, TP/SL, and AI strategy
+            Unlock real-time 10x Crypto Futures signals, exact entry points, TP/SL, and institutional momentum news
           </p>
         </div>
 
@@ -141,11 +137,11 @@ export const VipPaymentModal: React.FC<VipPaymentModalProps> = ({
         <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-slate-300 p-3 rounded-2xl bg-slate-950/60 border border-teal-500/20">
           <div className="flex items-center gap-1.5 text-emerald-400">
             <CheckCircle className="w-3.5 h-3.5 shrink-0" />
-            <span>Full Live Buy / Sell Signals</span>
+            <span>Uncensored Entry @ Levels</span>
           </div>
           <div className="flex items-center gap-1.5 text-emerald-400">
             <CheckCircle className="w-3.5 h-3.5 shrink-0" />
-            <span>Zero-Delay Instant Entry</span>
+            <span>10x Futures Multiplier Setups</span>
           </div>
           <div className="flex items-center gap-1.5 text-emerald-400">
             <CheckCircle className="w-3.5 h-3.5 shrink-0" />
@@ -153,7 +149,7 @@ export const VipPaymentModal: React.FC<VipPaymentModalProps> = ({
           </div>
           <div className="flex items-center gap-1.5 text-emerald-400">
             <CheckCircle className="w-3.5 h-3.5 shrink-0" />
-            <span>Analytic Charts & SMC Logic</span>
+            <span>Live Order Flow & Whale News</span>
           </div>
         </div>
 
@@ -186,7 +182,7 @@ export const VipPaymentModal: React.FC<VipPaymentModalProps> = ({
                     {key === '1_MONTH' ? '1 Month' : key === '3_MONTHS' ? '3 Months' : 'Lifetime'}
                   </span>
                   <span className="text-xs sm:text-sm font-black font-mono text-white block mt-0.5">
-                    {paymentMethod === 'QRIS' ? p.idr : p.usdt}
+                    {p.usdt}
                   </span>
                 </button>
               );
@@ -194,246 +190,179 @@ export const VipPaymentModal: React.FC<VipPaymentModalProps> = ({
           </div>
         </div>
 
-        {/* 2. Payment Method Tabs: QRIS vs USDT */}
-        <div className="space-y-2">
-          <div className="flex rounded-2xl bg-slate-950 p-1 border border-teal-500/25">
-            <button
-              type="button"
-              onClick={() => setPaymentMethod('QRIS')}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                paymentMethod === 'QRIS'
-                  ? 'bg-gradient-to-r from-teal-400 to-emerald-400 text-slate-950 shadow-md font-black'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>QRIS (Indonesia · Rupiah)</span>
-            </button>
+        {/* 2. USDT WALLET ADDRESS CARDS (NO QR CODE AS REQUESTED) */}
+        <div className="p-4 rounded-2xl bg-slate-950/80 border border-teal-500/25 space-y-3 font-mono">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-300 font-bold flex items-center gap-1.5">
+              <Coins className="w-3.5 h-3.5 text-teal-400" />
+              <span>Official USDT Wallet Addresses:</span>
+            </span>
+            <span className="text-[10px] text-amber-300 font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+              Transfer: {targetAmount}
+            </span>
+          </div>
 
+          {/* Network Selection Tabs */}
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => setPaymentMethod('USDT')}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                paymentMethod === 'USDT'
-                  ? 'bg-gradient-to-r from-teal-400 to-emerald-400 text-slate-950 shadow-md font-black'
-                  : 'text-slate-400 hover:text-white'
+              onClick={() => setUsdtNetwork('TRC20')}
+              className={`p-2 rounded-xl text-xs font-bold cursor-pointer transition-all border text-center ${
+                usdtNetwork === 'TRC20'
+                  ? 'bg-teal-500/25 border-teal-400 text-teal-300 shadow-md'
+                  : 'bg-slate-900/60 border-white/5 text-slate-400 hover:text-white'
               }`}
             >
-              <Coins className="w-3.5 h-3.5" />
-              <span>USDT (Crypto · Global)</span>
+              TRC-20 (Tron)
+            </button>
+            <button
+              type="button"
+              onClick={() => setUsdtNetwork('BEP20')}
+              className={`p-2 rounded-xl text-xs font-bold cursor-pointer transition-all border text-center ${
+                usdtNetwork === 'BEP20'
+                  ? 'bg-teal-500/25 border-teal-400 text-teal-300 shadow-md'
+                  : 'bg-slate-900/60 border-white/5 text-slate-400 hover:text-white'
+              }`}
+            >
+              BEP-20 (BSC)
             </button>
           </div>
 
-          {/* QRIS PAYMENT CONTENT */}
-          {paymentMethod === 'QRIS' && (
-            <div className="p-4 rounded-2xl bg-slate-950/80 border border-teal-500/20 space-y-3 font-mono text-center">
-              <div className="flex items-center justify-between text-xs border-b border-white/5 pb-2 text-slate-400">
-                <span>NMID: ID1020304050607</span>
-                <span className="text-emerald-400 font-bold">AuraSignals VIP</span>
-              </div>
-
-              {/* QRIS Code Container */}
-              <div className="inline-block p-3 rounded-2xl bg-white border-4 border-slate-900 shadow-2xl mx-auto">
-                {/* Standard Indonesian QRIS Header Logo */}
-                <div className="flex items-center justify-between px-2 pb-1 border-b border-slate-200">
-                  <span className="font-black text-slate-900 tracking-tighter text-sm">QRIS</span>
-                  <span className="text-[8px] font-bold text-red-600 bg-red-50 px-1 rounded">GPN</span>
-                </div>
-
-                {/* SVG Real Scannable QR Layout */}
-                <svg
-                  className="w-40 h-40 sm:w-44 sm:h-44 text-slate-950 mx-auto p-1"
-                  viewBox="0 0 100 100"
-                  fill="currentColor"
-                >
-                  <rect width="100" height="100" fill="#ffffff" />
-                  {/* Outer corner 1 */}
-                  <rect x="5" y="5" width="26" height="26" fill="#000" />
-                  <rect x="8" y="8" width="20" height="20" fill="#fff" />
-                  <rect x="12" y="12" width="12" height="12" fill="#000" />
-                  {/* Outer corner 2 */}
-                  <rect x="69" y="5" width="26" height="26" fill="#000" />
-                  <rect x="72" y="8" width="20" height="20" fill="#fff" />
-                  <rect x="76" y="12" width="12" height="12" fill="#000" />
-                  {/* Outer corner 3 */}
-                  <rect x="5" y="69" width="26" height="26" fill="#000" />
-                  <rect x="8" y="72" width="20" height="20" fill="#fff" />
-                  <rect x="12" y="76" width="12" height="12" fill="#000" />
-                  {/* Patterns */}
-                  <rect x="36" y="8" width="8" height="8" fill="#000" />
-                  <rect x="48" y="8" width="16" height="8" fill="#000" />
-                  <rect x="36" y="20" width="12" height="8" fill="#000" />
-                  <rect x="52" y="20" width="12" height="8" fill="#000" />
-                  <rect x="8" y="36" width="8" height="12" fill="#000" />
-                  <rect x="20" y="36" width="12" height="8" fill="#000" />
-                  <rect x="36" y="36" width="28" height="28" fill="#000" />
-                  <rect x="42" y="42" width="16" height="16" fill="#fff" />
-                  <rect x="46" y="46" width="8" height="8" fill="#000" />
-                  <rect x="68" y="36" width="24" height="8" fill="#000" />
-                  <rect x="76" y="48" width="16" height="16" fill="#000" />
-                  <rect x="8" y="52" width="24" height="8" fill="#000" />
-                  <rect x="36" y="68" width="8" height="24" fill="#000" />
-                  <rect x="48" y="68" width="24" height="8" fill="#000" />
-                  <rect x="52" y="80" width="8" height="12" fill="#000" />
-                  <rect x="68" y="76" width="24" height="16" fill="#000" />
-                </svg>
-
-                <div className="pt-1 border-t border-slate-200 text-[9px] font-sans text-slate-600 font-semibold">
-                  BCA · Mandiri · GoPay · OVO · Dana · ShopeePay
-                </div>
-              </div>
-
-              <div className="text-center space-y-1">
-                <span className="text-xs text-slate-400">Total Nominal Pembayaran:</span>
-                <div className="text-xl font-black text-emerald-400">
-                  {currentPlan.idr}
-                </div>
-                <p className="text-[11px] text-slate-400 font-sans">
-                  Scan QRIS di atas via m-Banking atau e-Wallet apa saja.
-                </p>
-              </div>
+          {/* Address Display Box with 1-Click Copy */}
+          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-teal-500/30 space-y-2">
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span>{usdtNetwork === 'TRC20' ? 'Tron Network (TRC-20)' : 'BNB Smart Chain (BEP-20)'}</span>
+              <span className="text-[10px] text-teal-300 font-semibold">Instant Deposit</span>
             </div>
-          )}
 
-          {/* USDT PAYMENT CONTENT */}
-          {paymentMethod === 'USDT' && (
-            <div className="p-4 rounded-2xl bg-slate-950/80 border border-teal-500/20 space-y-3 font-mono">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Select Network:</span>
-                <div className="flex gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setUsdtNetwork('TRC20')}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                      usdtNetwork === 'TRC20'
-                        ? 'bg-teal-500/25 border border-teal-400 text-teal-300'
-                        : 'bg-slate-900 text-slate-400 border border-white/5'
-                    }`}
-                  >
-                    TRC-20 (Tron)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setUsdtNetwork('BEP20')}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                      usdtNetwork === 'BEP20'
-                        ? 'bg-teal-500/25 border border-teal-400 text-teal-300'
-                        : 'bg-slate-900 text-slate-400 border border-white/5'
-                    }`}
-                  >
-                    BEP-20 (BSC)
-                  </button>
-                </div>
-              </div>
+            <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-950 border border-white/10">
+              <span className="text-xs text-white font-mono break-all font-semibold select-all">
+                {usdtAddresses[usdtNetwork]}
+              </span>
 
-              <div className="p-3 rounded-xl bg-slate-900/90 border border-white/10 space-y-1.5">
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Deposit Address ({usdtNetwork})</span>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(usdtAddresses[usdtNetwork])}
-                    className="text-teal-300 hover:text-white flex items-center gap-1 cursor-pointer"
-                  >
-                    {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    <span>{copied ? 'Copied' : 'Copy'}</span>
-                  </button>
-                </div>
-                <div className="text-xs font-mono text-white break-all bg-black/40 p-2 rounded-lg border border-white/5 select-all">
-                  {usdtAddresses[usdtNetwork]}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="text-slate-400">Amount to Send:</span>
-                <span className="text-base font-black text-emerald-400">{currentPlan.usdt}</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => handleCopy(usdtNetwork, usdtAddresses[usdtNetwork])}
+                className={`p-2 rounded-lg shrink-0 flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+                  copiedNetwork === usdtNetwork
+                    ? 'bg-emerald-500 text-slate-950 shadow-md'
+                    : 'bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-400/40'
+                }`}
+              >
+                {copiedNetwork === usdtNetwork ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Tersalin</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Salin</span>
+                  </>
+                )}
+              </button>
             </div>
-          )}
+
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+              <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+              <span>Pastikan memilih jaringan {usdtNetwork === 'TRC20' ? 'TRC-20' : 'BEP-20'} yang tepat saat transfer.</span>
+            </div>
+          </div>
         </div>
 
-        {/* 3. Confirmation Flow */}
-        <div className="space-y-3 pt-1 border-t border-white/10">
-          <div className="text-xs font-mono font-bold text-white flex items-center gap-1.5">
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span>How Confirmation Works:</span>
-          </div>
-
-          {/* Quick WA Button */}
-          <button
-            type="button"
-            onClick={handleWhatsAppConfirm}
-            className="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold font-mono text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95"
-          >
-            <MessageSquare className="w-4 h-4 fill-current" />
-            <span>Fast Confirm via WhatsApp (Instant PIN)</span>
-          </button>
-
-          {/* OR in-app submit form */}
-          {submitSuccess ? (
-            <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-center space-y-1.5 font-mono">
-              <CheckCircle className="w-6 h-6 text-emerald-400 mx-auto" />
-              <div className="text-xs font-bold text-white">
-                Payment Submitted Successfully!
-              </div>
-              <p className="text-[11px] text-slate-300 font-sans">
-                Admin is verifying your transaction. You will receive your 6-digit VIP PIN shortly via WhatsApp/Telegram.
-              </p>
+        {/* 3. Confirmation Section */}
+        {submitSuccess ? (
+          <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-center space-y-2 font-mono">
+            <CheckCircle className="w-8 h-8 text-emerald-400 mx-auto" />
+            <h3 className="font-extrabold text-white text-sm">
+              Permintaan Pembayaran Terkirim!
+            </h3>
+            <p className="text-xs text-slate-300 font-sans">
+              Admin akan memverifikasi transfer USDT Anda dalam 5-15 menit dan memberikan 6-digit VIP PIN.
+            </p>
+            <div className="pt-2 flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={handleWhatsAppConfirm}
+                className="flex-1 py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>Konfirmasi Instan via WhatsApp</span>
+              </button>
+              {onOpenAccessModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenAccessModal();
+                  }}
+                  className="py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs cursor-pointer"
+                >
+                  Masukkan VIP PIN
+                </button>
+              )}
             </div>
-          ) : (
-            <form onSubmit={handleSubmitProof} className="space-y-2 font-mono text-xs">
+          </div>
+        ) : (
+          <form onSubmit={handleSubmitProof} className="space-y-3 font-mono">
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-300 block">
+                Nama & Kontak Anda:
+              </label>
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="text"
-                  placeholder="Your Name"
+                  placeholder="Nama Lengkap"
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900/80 border border-white/10 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-teal-400"
                   required
-                  className="p-2 rounded-xl bg-slate-900 border border-white/10 text-white placeholder-slate-500 text-xs focus:border-teal-400 outline-none"
                 />
                 <input
                   type="text"
                   placeholder="WhatsApp / Telegram"
                   value={userContact}
                   onChange={(e) => setUserContact(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900/80 border border-white/10 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-teal-400"
                   required
-                  className="p-2 rounded-xl bg-slate-900 border border-white/10 text-white placeholder-slate-500 text-xs focus:border-teal-400 outline-none"
                 />
               </div>
+            </div>
 
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Ref No. / TxHash / Bank Name"
-                  value={txRef}
-                  onChange={(e) => setTxRef(e.target.value)}
-                  className="flex-1 p-2 rounded-xl bg-slate-900 border border-white/10 text-white placeholder-slate-500 text-xs focus:border-teal-400 outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-3.5 py-2 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 border border-teal-400/40 text-teal-300 font-bold text-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{isSubmitting ? 'Sending...' : 'Submit'}</span>
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-300 block">
+                TxID / Hash Transaksi (Opsional jika konfirmasi via WA):
+              </label>
+              <input
+                type="text"
+                placeholder="0x... atau TxID Tron"
+                value={txRef}
+                onChange={(e) => setTxRef(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-900/80 border border-white/10 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-teal-400"
+              />
+            </div>
 
-        {/* Existing PIN Link */}
-        <div className="text-center pt-2 border-t border-white/5">
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              if (onOpenAccessModal) onOpenAccessModal();
-            }}
-            className="text-[11px] font-mono text-teal-400 hover:text-teal-300 underline cursor-pointer"
-          >
-            Already have a 6-digit VIP PIN? Enter PIN Code here
-          </button>
-        </div>
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-teal-500/20 cursor-pointer disabled:opacity-50"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{isSubmitting ? 'Mengirim...' : 'Kirim Bukti Pembayaran'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleWhatsAppConfirm}
+                className="py-2.5 px-4 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/40 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Konfirmasi WA</span>
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

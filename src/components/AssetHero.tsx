@@ -14,7 +14,9 @@ export const AssetHero: React.FC<AssetHeroProps> = ({
   currentTicker,
   priceTickDirection,
 }) => {
-  const isUp = (currentTicker?.change24h || 0) >= 0;
+  const changePct = currentTicker?.changePercent ?? 0;
+  const isUp = changePct > 0;
+  const isDown = changePct < 0;
 
   const assetDetails: Record<AssetSymbol, { short: string; full: string; decimals: number }> = {
     'BTC/USDT': { short: 'BTC', full: 'Bitcoin', decimals: 2 },
@@ -85,18 +87,18 @@ export const AssetHero: React.FC<AssetHeroProps> = ({
         </div>
       </div>
 
-      {/* 24h & High/Low Subtitle */}
+      {/* 24h & High/Low Subtitle: Strict Red for Minus, Emerald for Plus */}
       <div className="flex items-center gap-1.5 text-xs font-mono text-slate-400 mb-1">
-        <span className={isUp ? 'text-emerald-400' : 'text-rose-400'}>
-          {isUp ? '↗' : '↘'}
+        <span className={isDown ? 'text-rose-400' : isUp ? 'text-emerald-400' : 'text-slate-400'}>
+          {isDown ? '↘' : isUp ? '↗' : '→'}
         </span>
         <span className="text-slate-300">
           24h High: ${formatPrice(currentTicker?.high24h)}
         </span>
         <span className="text-slate-500">·</span>
-        <span className={isUp ? 'text-emerald-400' : 'text-rose-400'}>
+        <span className={isDown ? 'text-rose-400 font-bold' : isUp ? 'text-emerald-400 font-bold' : 'text-slate-400 font-bold'}>
           {isUp ? '+' : ''}
-          {currentTicker?.changePercent?.toFixed(2) || '0.00'}%
+          {changePct.toFixed(2)}%
         </span>
       </div>
     </div>

@@ -135,6 +135,10 @@ export const AdminControlModal: React.FC<AdminControlModalProps> = ({
         ? Math.round(Math.abs(tp - entry) * 10000)
         : Math.round(Math.abs(tp - entry));
 
+    const dir = manualDirection === 'BUY' ? 1 : -1;
+    const targetRoePercent = Math.round((Math.abs(tp - entry) / entry) * 10 * 100 * 10) / 10;
+    const slRoePercent = -Math.round((Math.abs(entry - sl) / entry) * 10 * 100 * 10) / 10;
+
     const newSig: SignalData = {
       id: `manual-${manualAsset.toLowerCase().replace('/', '')}-${Date.now()}`,
       asset: manualAsset,
@@ -142,16 +146,21 @@ export const AdminControlModal: React.FC<AdminControlModalProps> = ({
       createdAt: Date.now(),
       signal: manualDirection === 'BUY' ? 'STRONG BUY' : 'STRONG SELL',
       confidencePercent: 92,
-      timeHorizon: 'Admin Signal Execution',
-      orderType: manualDirection === 'BUY' ? 'Market Buy' : 'Market Sell',
+      timeHorizon: 'Admin 10x Futures Signal',
+      orderType: manualDirection === 'BUY' ? 'Futures Long (10x)' : 'Futures Short (10x)',
+      leverageMultiplier: 10,
+      marginMode: 'ISOLATED',
+      recommendedMarginUsdt: 150.0,
+      targetRoePercent,
       entryPrice: entry,
       entryRange: {
         min: Math.min(entry, manualDirection === 'BUY' ? entry - 10 : entry + 10),
         max: Math.max(entry, manualDirection === 'BUY' ? entry - 10 : entry + 10),
       },
-      takeProfit: [{ target: 'TP 1', price: tp, pipsOrPoints: pips }],
+      takeProfit: [{ target: 'TP 1', price: tp, targetRoePercent, pipsOrPoints: pips }],
       stopLoss: {
         price: sl,
+        slRoePercent,
         pipsOrPoints: Math.abs(entry - sl),
         riskRewardRatio: (Math.abs(tp - entry) / Math.abs(entry - sl)).toFixed(1),
       },
@@ -163,7 +172,8 @@ export const AdminControlModal: React.FC<AdminControlModalProps> = ({
         marketBias: manualDirection === 'BUY' ? 'Bullish Expansion' : 'Bearish Liquidity Run',
       },
       macroeconomicCatalyst: 'Administrator discretionary institutional setup.',
-      riskManagementNote: 'Hard TP/SL managed.',
+      newsCatalyst: 'Master Admin verified institutional order flow execution.',
+      riskManagementNote: '10x Leverage isolated. Maximum risk managed.',
       status: 'RUNNING',
     };
 

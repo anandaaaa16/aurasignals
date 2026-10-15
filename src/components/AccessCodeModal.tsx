@@ -192,7 +192,7 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
                 className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-teal-500/20 to-emerald-500/20 hover:from-amber-500/30 hover:to-emerald-500/30 border border-amber-500/30 text-amber-300 font-mono text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/10"
               >
                 <span>Don't have a VIP code? Get VIP Access</span>
-                <span className="text-[10px] bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded font-black">QRIS / USDT</span>
+                <span className="text-[10px] bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded font-black">USDT</span>
               </button>
             </div>
           </div>

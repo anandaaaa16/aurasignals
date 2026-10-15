@@ -1,104 +1,124 @@
 import React, { useMemo } from 'react';
 import { AssetSymbol, ClosedTrade, SignalData, calculateTradeGain } from '../types';
-import { ArrowUpRight, ArrowDownRight, Lock, Sparkles } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Lock, Sparkles, Layers, Zap } from 'lucide-react';
 
 interface OwnerLivePortfolioProps {
-  currentSignal: SignalData | null;
-  currentPrice: number;
-  selectedAsset: AssetSymbol;
+  activeSignals: Record<AssetSymbol, SignalData | null>;
+  currentPrices: Record<AssetSymbol, number>;
   closedTrades: ClosedTrade[];
-  priceTickDirection: 'up' | 'down' | 'neutral';
   userRole?: 'GUEST' | 'MEMBER' | 'ADMIN';
   onOpenAccessModal?: () => void;
+  onOpenVipPayment?: () => void;
 }
 
 export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
-  currentSignal,
-  currentPrice,
-  selectedAsset,
+  activeSignals,
+  currentPrices,
   closedTrades,
-  priceTickDirection,
   userRole = 'GUEST',
   onOpenAccessModal,
+  onOpenVipPayment,
 }) => {
   const INITIAL_CAPITAL = 500.0;
   const isGuest = userRole === 'GUEST';
+  const LEVERAGE = 10;
+  const MARGIN_PER_ASSET = 150.0; // $150 USDT margin per position ($1,500 notional)
 
-  // Realized profit calculation using calculateTradeGain
+  // Realized profit calculation from closed trades
   const realizedPnl = useMemo(() => {
     return closedTrades.reduce((acc, t) => {
       return acc + calculateTradeGain(t);
     }, 0);
   }, [closedTrades]);
 
-  // Floating PnL of current running position
-  const runningPosition = useMemo(() => {
-    if (!currentSignal || !currentPrice) return null;
+  // Combined running positions for all 3 assets (BTC, ETH, XRP) in Crypto Futures (10x Leverage)
+  const activePositions = useMemo(() => {
+    const assets: AssetSymbol[] = ['BTC/USDT', 'ETH/USDT', 'XRP/USDT'];
+    return assets
+      .map((asset) => {
+        const signal = activeSignals[asset];
+        const price = currentPrices[asset];
+        if (!signal || !price) return null;
 
-    const isBuy = currentSignal.signal.includes('BUY');
-    const entryPrice =
-      currentSignal.entryPrice ||
-      (currentSignal.entryRange.min + currentSignal.entryRange.max) / 2;
+        const isBuy = signal.signal.includes('BUY');
+        const entryPrice =
+          signal.entryPrice ||
+          (signal.entryRange.min + signal.entryRange.max) / 2;
 
-    const asset = currentSignal.asset;
-    const lotSize = asset === 'BTC/USDT' ? 0.02 : asset === 'ETH/USDT' ? 0.5 : 1000;
+        // Price percentage movement
+        const priceMovePct = entryPrice > 0 ? ((price - entryPrice) / entryPrice) * (isBuy ? 1 : -1) : 0;
+        // 10x Leverage Multiplier applied to ROE
+        const roePercent = priceMovePct * LEVERAGE * 100;
+        // Floating Dollar Profit on $150 USDT Margin
+        const floatingDollar = MARGIN_PER_ASSET * (roePercent / 100);
 
-    const priceDiff = isBuy ? currentPrice - entryPrice : entryPrice - currentPrice;
-    const floatingDollar =
-      asset === 'BTC/USDT'
-        ? priceDiff * 0.02
-        : asset === 'ETH/USDT'
-        ? priceDiff * 0.5
-        : priceDiff * 1000;
-    const floatingPercent = (floatingDollar / INITIAL_CAPITAL) * 100;
+        return {
+          asset,
+          direction: isBuy ? ('BUY' as const) : ('SELL' as const),
+          leverage: LEVERAGE,
+          marginUsdt: MARGIN_PER_ASSET,
+          positionNotional: MARGIN_PER_ASSET * LEVERAGE,
+          entryPrice,
+          currentPrice: price,
+          floatingDollar: Math.round(floatingDollar * 100) / 100,
+          roePercent: Math.round(roePercent * 10) / 10,
+          targetTp: signal.takeProfit[0]?.price,
+          targetRoe: signal.takeProfit[0]?.targetRoePercent || 25.0,
+          stopLoss: signal.stopLoss?.price,
+          slRoe: signal.stopLoss?.slRoePercent || -10.0,
+        };
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null);
+  }, [activeSignals, currentPrices]);
 
-    return {
-      asset: currentSignal.asset,
-      direction: isBuy ? ('BUY' as const) : ('SELL' as const),
-      lotSize,
-      entryPrice,
-      currentPrice,
-      floatingDollar: Math.round(floatingDollar * 100) / 100,
-      floatingPercent: Math.round(floatingPercent * 100) / 100,
-      targetTp: currentSignal.takeProfit[0]?.price,
-      stopLoss: currentSignal.stopLoss?.price,
-    };
-  }, [currentSignal, currentPrice]);
+  // Total Combined Floating Dollar across all active positions
+  const totalCombinedFloating = useMemo(() => {
+    return activePositions.reduce((acc, pos) => acc + pos.floatingDollar, 0);
+  }, [activePositions]);
 
-  const currentEquity = Math.round((INITIAL_CAPITAL + realizedPnl + (runningPosition?.floatingDollar || 0)) * 100) / 100;
+  const currentEquity = Math.round((INITIAL_CAPITAL + realizedPnl + totalCombinedFloating) * 100) / 100;
   const totalGrowthPercent = Math.round(((currentEquity - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 1000) / 10;
+  const isPositiveReturn = totalGrowthPercent >= 0;
+  const isPositiveFloating = totalCombinedFloating >= 0;
+
   const winCount = closedTrades.filter((t) => t.hitType === 'HIT_TP').length;
   const winRate = closedTrades.length > 0 ? Math.round((winCount / closedTrades.length) * 1000) / 10 : 85.7;
 
-  const isFloatingProfit = (runningPosition?.floatingDollar || 0) >= 0;
-
-  const formatPrice = (val?: number) => {
+  const formatPrice = (val?: number, asset?: AssetSymbol) => {
     if (!val) return '---';
-    if (selectedAsset === 'XRP/USDT') return val.toFixed(4);
-    if (selectedAsset === 'ETH/USDT') return val.toFixed(2);
+    if (asset === 'XRP/USDT') return val.toFixed(4);
+    if (asset === 'ETH/USDT') return val.toFixed(2);
     return val.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+  };
+
+  const handleUnlockClick = () => {
+    if (onOpenVipPayment) {
+      onOpenVipPayment();
+    } else if (onOpenAccessModal) {
+      onOpenAccessModal();
+    }
   };
 
   return (
     <div className="glass-panel rounded-3xl p-4 sm:p-5 border border-teal-500/25 shadow-2xl space-y-3.5 backdrop-blur-2xl">
-      {/* Header: Live Portfolio & Initial Portfolio Balance */}
+      {/* Header: Live Trading & Initial Portfolio Balance */}
       <div className="flex items-center justify-between border-b border-teal-500/15 pb-2.5">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-md shadow-emerald-400" />
-          <h3 className="font-extrabold text-sm sm:text-base text-white tracking-wide font-mono">
-            Live Portfolio
+          <h3 className="font-extrabold text-sm sm:text-base text-white tracking-wide font-mono flex items-center gap-1.5">
+            <span>Live Trading</span>
           </h3>
         </div>
 
-        <div className="text-right font-mono text-xs text-slate-400">
-          Portfolio: <strong className="text-white">${INITIAL_CAPITAL.toFixed(2)}</strong>
+        <div className="text-right font-mono text-xs text-slate-400 flex items-center gap-1.5">
+          <span>Balance: <strong className="text-white">${INITIAL_CAPITAL.toFixed(2)}</strong></span>
         </div>
       </div>
 
       {/* Equity & Return Metrics */}
       <div className="grid grid-cols-3 gap-2 font-mono">
         <div className="p-2.5 rounded-2xl bg-slate-900/60 border border-teal-500/20">
-          <span className="text-[10px] text-slate-400 block mb-0.5">Equity</span>
+          <span className="text-[10px] text-slate-400 block mb-0.5">Live Equity</span>
           <div className="text-base sm:text-lg font-black text-white tabular-nums tracking-tight">
             ${currentEquity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
@@ -106,99 +126,154 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
 
         <div className="p-2.5 rounded-2xl bg-slate-900/60 border border-teal-500/20">
           <span className="text-[10px] text-slate-400 block mb-0.5">Total Return</span>
-          <div className="text-base sm:text-lg font-black text-emerald-400 tabular-nums tracking-tight">
-            +{totalGrowthPercent}%
+          <div
+            className={`text-base sm:text-lg font-black tabular-nums tracking-tight ${
+              isPositiveReturn ? 'text-emerald-400' : 'text-rose-400'
+            }`}
+          >
+            {isPositiveReturn ? '+' : ''}
+            {totalGrowthPercent.toFixed(1)}%
           </div>
         </div>
 
         <div className="p-2.5 rounded-2xl bg-slate-900/60 border border-teal-500/20">
           <span className="text-[10px] text-slate-400 block mb-0.5">Win Rate</span>
           <div className="text-base sm:text-lg font-black text-cyan-300 tabular-nums">
-            {winRate}%
+            {winRate.toFixed(1)}%
           </div>
         </div>
       </div>
 
-      {/* Active Position / Standby status */}
-      {runningPosition ? (
-        <div className="relative overflow-hidden rounded-2xl border border-teal-500/25 bg-slate-950/70 p-3 space-y-2">
-          {/* If Guest: Obfuscate / Frosted glass overlay so entry signals are completely concealed! */}
-          {isGuest && (
-            <div className="absolute inset-0 z-20 backdrop-blur-md bg-slate-950/70 flex flex-col items-center justify-center p-3 text-center">
-              <button
-                type="button"
-                onClick={onOpenAccessModal}
-                className="group px-4 py-2 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 border border-teal-400/50 hover:border-teal-300 text-white font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-teal-500/10 active:scale-95"
-              >
-                <Lock className="w-3.5 h-3.5 text-amber-400" />
-                <span>Join VIP for full access</span>
-                <Sparkles className="w-3 h-3 text-amber-300" />
-              </button>
-              <span className="text-[10px] text-slate-400 font-mono mt-1">
-                Active execution signal & entry price protected
-              </span>
-            </div>
-          )}
+      {/* Active Positions: Combined View of 3 Crypto Signals (BTC, ETH, XRP) */}
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center justify-between text-xs font-mono px-1">
+          <div className="flex items-center gap-1.5 text-slate-300 font-bold">
+            <Layers className="w-3.5 h-3.5 text-teal-400" />
+            <span>Active Positions ({activePositions.length}/3 Live)</span>
+          </div>
 
-          <div className={`transition-all ${isGuest ? 'filter blur-[5px] select-none pointer-events-none opacity-40' : ''}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div
-                  className={`p-1.5 rounded-lg ${
-                    runningPosition.direction === 'BUY'
-                      ? 'bg-emerald-500/20 text-emerald-400'
-                      : 'bg-rose-500/20 text-rose-400'
-                  }`}
-                >
-                  {runningPosition.direction === 'BUY' ? (
-                    <ArrowUpRight className="w-4 h-4 stroke-[3]" />
-                  ) : (
-                    <ArrowDownRight className="w-4 h-4 stroke-[3]" />
-                  )}
-                </div>
-
-                <div>
-                  <span className="font-extrabold text-xs text-white tracking-wide font-mono">
-                    {runningPosition.direction} {runningPosition.asset}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono block">
-                    Lot: {runningPosition.lotSize} · Entry @ ${formatPrice(runningPosition.entryPrice)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Live Floating PnL */}
-              <div className="text-right font-mono">
-                <span className="text-[10px] text-slate-400 block">Floating PnL</span>
-                <div
-                  className={`text-sm font-black tabular-nums ${
-                    isFloatingProfit ? 'text-emerald-400' : 'text-rose-400'
-                  }`}
-                >
-                  {isFloatingProfit ? '+' : ''}${runningPosition.floatingDollar.toFixed(2)} ({isFloatingProfit ? '+' : ''}{runningPosition.floatingPercent.toFixed(2)}%)
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-[10px] font-mono pt-1.5 border-t border-white/5">
-              <div className="text-slate-300">
-                <span className="text-slate-500">TP: </span>
-                <span className="text-emerald-400 font-bold">${formatPrice(runningPosition.targetTp)}</span>
-              </div>
-              <div className="text-right text-slate-300">
-                <span className="text-slate-500">SL: </span>
-                <span className="text-rose-400 font-bold">${formatPrice(runningPosition.stopLoss)}</span>
-              </div>
-            </div>
+          {/* Real-time Combined Floating PnL - Visible to all users */}
+          <div
+            className={`font-black tabular-nums flex items-center gap-1 ${
+              isPositiveFloating ? 'text-emerald-400' : 'text-rose-400'
+            }`}
+          >
+            <span className="text-[10px] text-slate-400 font-normal">Floating:</span>
+            <span>
+              {isPositiveFloating ? '+' : '-'}${Math.abs(totalCombinedFloating).toFixed(2)}
+            </span>
           </div>
         </div>
-      ) : (
-        <div className="p-3 rounded-2xl bg-slate-950/60 border border-teal-500/15 text-center">
-          <div className="text-xs font-mono font-bold text-slate-300">
-            No Active Position · AI Scanning 24/7
+
+        {/* Positions Container */}
+        {activePositions.length > 0 ? (
+          <div className="rounded-2xl border border-teal-500/25 bg-slate-950/70 p-2.5 space-y-2">
+            {/* Live Positions List - Floating PnL is completely visible; only Entry is sensored for Guests */}
+            {activePositions.map((pos) => {
+              const isPosProfit = pos.floatingDollar >= 0;
+              return (
+                <div
+                  key={pos.asset}
+                  className="p-2.5 rounded-xl bg-slate-900/70 border border-white/5 space-y-1.5 hover:border-teal-500/30 transition-all"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`p-1.5 rounded-lg ${
+                          pos.direction === 'BUY'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        }`}
+                      >
+                        {pos.direction === 'BUY' ? (
+                          <ArrowUpRight className="w-3.5 h-3.5 stroke-[3]" />
+                        ) : (
+                          <ArrowDownRight className="w-3.5 h-3.5 stroke-[3]" />
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-extrabold text-xs text-white tracking-wide font-mono">
+                            {pos.direction === 'BUY' ? 'LONG' : 'SHORT'} {pos.asset}
+                          </span>
+                        </div>
+
+                        {/* SENSORING REQUIREMENT:
+                            Only sensor Entry @ for Guests. No VIP Unlock text next to entry.
+                            Members see exact Entry @ level! */}
+                        <div className="text-[10px] font-mono mt-0.5">
+                          {isGuest ? (
+                            <div className="inline-flex items-center gap-1 text-slate-400">
+                              <span>Entry @</span>
+                              <span className="px-1.5 py-0.2 rounded bg-amber-500/15 border border-amber-400/30 text-amber-300 font-bold tracking-widest text-[9px]">
+                                ••••••
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 font-bold">
+                              Entry @ ${formatPrice(pos.entryPrice, pos.asset)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Live Floating PnL - ALWAYS FULLY VISIBLE TO BOTH GUESTS AND MEMBERS */}
+                    <div className="text-right font-mono">
+                      <div
+                        className={`text-xs sm:text-sm font-black tabular-nums ${
+                          isPosProfit ? 'text-emerald-400' : 'text-rose-400'
+                        }`}
+                      >
+                        {isPosProfit ? '+' : '-'}${Math.abs(pos.floatingDollar).toFixed(2)}
+                      </div>
+                      <div
+                        className={`text-[10px] font-bold tabular-nums ${
+                          isPosProfit ? 'text-emerald-400/90' : 'text-rose-400/90'
+                        }`}
+                      >
+                        {isPosProfit ? '+' : ''}{pos.roePercent.toFixed(1)}% ROE
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Target TP & Invalidation SL */}
+                  <div className="grid grid-cols-2 gap-2 text-[10px] font-mono pt-1.5 border-t border-white/5">
+                    <div className="text-slate-300 flex items-center justify-between">
+                      <span className="text-slate-500">TP 1:</span>
+                      <span className="text-emerald-400 font-bold">
+                        ${formatPrice(pos.targetTp, pos.asset)}{' '}
+                        <span className="text-[9px] text-emerald-400/70 font-normal">
+                          (+{pos.targetRoe}%)
+                        </span>
+                      </span>
+                    </div>
+
+                    <div className="text-slate-300 flex items-center justify-between">
+                      <span className="text-slate-500">SL:</span>
+                      <span className="text-rose-400 font-bold">
+                        ${formatPrice(pos.stopLoss, pos.asset)}{' '}
+                        <span className="text-[9px] text-rose-400/70 font-normal">
+                          ({pos.slRoe}%)
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="p-3 rounded-2xl bg-slate-950/60 border border-teal-500/15 text-center">
+            <div className="text-xs font-mono font-bold text-slate-300">
+              No Active Position · AI Scanning BTC, ETH & XRP 24/7
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

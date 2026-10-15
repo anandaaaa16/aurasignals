@@ -26,12 +26,12 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
             MARKET CLOSED · WEEKEND
           </h3>
           <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
-            Global spot gold market is closed for the weekend. All positions closed flat with zero risk. Signals resume Monday 00:00 UTC.
+            Traditional markets closed. Crypto Perpetual Futures trade 24/7/365 with active continuous order flow.
           </p>
         </div>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] font-mono text-amber-300 font-bold">
           <span className="w-2 h-2 rounded-full bg-amber-400" />
-          <span>Status: Flat (Zero Exposure)</span>
+          <span>Status: Crypto Futures Active</span>
         </div>
       </div>
     );
@@ -48,8 +48,8 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
   const isBuy = signal.signal.includes('BUY');
   const isSell = signal.signal.includes('SELL');
   const avgEntry = signal.entryPrice || (signal.entryRange.min + signal.entryRange.max) / 2;
-  const tp1Price = signal.takeProfit[0]?.price || (isBuy ? avgEntry + 10 : avgEntry - 10);
-  const slPrice = signal.stopLoss?.price || (isBuy ? avgEntry - 10 : avgEntry + 10);
+  const tp1Price = signal.takeProfit[0]?.price || (isBuy ? avgEntry * 1.025 : avgEntry * 0.975);
+  const slPrice = signal.stopLoss?.price || (isBuy ? avgEntry * 0.99 : avgEntry * 1.01);
 
   // Real-time tick progress calculation towards single TP
   let progressPercent = 0;
@@ -69,37 +69,31 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
     }
   }
 
-  // Real-Time Floating PnL calculation on every single tick
-  const diff = isBuy ? currentPrice - avgEntry : avgEntry - currentPrice;
-  const isFloatingProfit = diff >= 0;
-  const floatingPips =
-    signal.asset === 'XRP/USDT'
-      ? Math.round(diff * 10000)
-      : signal.asset === 'ETH/USDT'
-      ? Math.round(diff * 10) / 10
-      : Math.round(diff);
-  const floatingPercent = Math.round((diff / avgEntry) * 100 * 100) / 100;
+  // Real-Time Floating PnL calculation on every single tick (10x Leverage Multiplier)
+  const leverage = 10;
+  const standardMargin = 150.0; // $150 USDT margin
+  const priceMovePct = avgEntry > 0 ? ((currentPrice - avgEntry) / avgEntry) * (isBuy ? 1 : -1) : 0;
+  const roePercent = priceMovePct * leverage * 100;
+  const floatingDollar = standardMargin * (roePercent / 100);
+  const isFloatingProfit = floatingDollar >= 0;
 
-  // Distance in points/pips to TP and SL
-  const distToTpPips =
-    signal.asset === 'XRP/USDT'
-      ? Math.max(0, Math.round(Math.abs(tp1Price - currentPrice) * 10000))
-      : signal.asset === 'ETH/USDT'
-      ? Math.max(0, Math.round(Math.abs(tp1Price - currentPrice) * 10) / 10)
-      : Math.max(0, Math.round(Math.abs(tp1Price - currentPrice)));
+  // Price distance to TP & SL in USDT
+  const distToTpUsdt = Math.abs(tp1Price - currentPrice);
+  const distToSlUsdt = Math.abs(currentPrice - slPrice);
 
-  const distToSlPips =
-    signal.asset === 'XRP/USDT'
-      ? Math.max(0, Math.round(Math.abs(currentPrice - slPrice) * 10000))
-      : signal.asset === 'ETH/USDT'
-      ? Math.max(0, Math.round(Math.abs(currentPrice - slPrice) * 10) / 10)
-      : Math.max(0, Math.round(Math.abs(currentPrice - slPrice)));
+  const formatPrice = (v?: number) => {
+    if (!v) return '---';
+    if (signal.asset === 'XRP/USDT') return v.toFixed(4);
+    if (signal.asset === 'ETH/USDT') return v.toFixed(2);
+    return v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+  };
 
-  const pipUnit = signal.asset === 'XRP/USDT' ? 'pips' : 'pts';
+  const targetRoe = signal.takeProfit[0]?.targetRoePercent || 25.0;
+  const slRoe = signal.stopLoss?.slRoePercent || -10.0;
 
   return (
     <div className="glass-panel rounded-3xl p-4 sm:p-5 border border-teal-500/25 shadow-2xl space-y-3.5 backdrop-blur-2xl">
-      {/* 1. Header: Live Signal Status & Confidence */}
+      {/* 1. Header: Live Signal Status & 10x Futures Multiplier */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <div
@@ -123,7 +117,7 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono font-bold text-teal-300">
-                {signal.asset} · H1
+                {signal.asset} · 10x Futures
               </span>
               <span className="flex items-center gap-1 text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20">
                 <Radio className="w-2 h-2 animate-pulse" />
@@ -137,32 +131,31 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
                   isBuy ? 'text-emerald-400' : isSell ? 'text-rose-400' : 'text-amber-400'
                 }`}
               >
-                {signal.signal}
+                {signal.signal} ({isBuy ? 'LONG' : 'SHORT'})
               </span>
-              <span className="text-xs text-slate-400 font-mono">
-                ({signal.orderType})
+              <span className="text-[10px] text-amber-300 font-mono font-bold bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
+                10x Leverage
               </span>
             </div>
           </div>
         </div>
 
-        {/* Floating Live Profit Pill */}
+        {/* Floating Live Profit Pill with ROE % */}
         <div className="text-right font-mono">
-          <div className="text-[10px] text-slate-400 uppercase">Floating PnL</div>
+          <div className="text-[10px] text-slate-400 uppercase">Live Floating PnL</div>
           <div
             className={`text-base font-black tabular-nums ${
               isFloatingProfit ? 'text-emerald-400' : 'text-rose-400'
             }`}
           >
-            {isFloatingProfit ? '+' : ''}
-            {floatingPips} {pipUnit}
+            {isFloatingProfit ? '+' : '-'}${Math.abs(floatingDollar).toFixed(2)}
           </div>
           <div
             className={`text-[10px] font-bold ${
-              isFloatingProfit ? 'text-emerald-400/80' : 'text-rose-400/80'
+              isFloatingProfit ? 'text-emerald-400/90' : 'text-rose-400/90'
             }`}
           >
-            ({isFloatingProfit ? '+' : ''}{floatingPercent}%)
+            ({isFloatingProfit ? '+' : ''}{roePercent.toFixed(1)}% ROE)
           </div>
         </div>
       </div>
@@ -172,7 +165,7 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
         <div className="flex items-center justify-between text-xs font-mono">
           <div className="flex items-center gap-1.5 text-slate-300">
             <Target className="w-3.5 h-3.5 text-teal-400" />
-            <span className="font-semibold text-slate-200">Progress to TP</span>
+            <span className="font-semibold text-slate-200">Progress to TP (+{targetRoe}% ROE)</span>
           </div>
           <span className="text-emerald-400 font-bold font-mono">
             {progressPercent}%
@@ -192,29 +185,29 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
         <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-0.5">
           <span className="flex items-center gap-1 text-teal-300">
             <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-            <span>{distToTpPips} {pipUnit} to TP</span>
+            <span>Target: ${formatPrice(distToTpUsdt)} to TP</span>
           </span>
           <span className="flex items-center gap-1 text-rose-400/80">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-            <span>{distToSlPips} {pipUnit} to SL</span>
+            <span>Invalidation: ${formatPrice(distToSlUsdt)} to SL</span>
           </span>
         </div>
       </div>
 
-      {/* 3. Target Level Cards: 1 TP & 1 SL (Clean without clutter text) */}
+      {/* 3. Target Level Cards: 1 TP & 1 SL */}
       <div className="grid grid-cols-2 gap-2.5 pt-1">
         <div className="p-3 glass-panel-subtle rounded-2xl text-left border border-emerald-500/30 bg-emerald-500/5">
           <div className="text-[10px] text-emerald-400 font-bold uppercase flex items-center justify-between mb-1">
             <span className="flex items-center gap-1">
               <Target className="w-3 h-3 text-emerald-400" />
-              <span>TAKE PROFIT (TP)</span>
+              <span>TAKE PROFIT (TP 1)</span>
             </span>
-            <span className="text-[9px] text-emerald-400/80 font-mono">
-              +{signal.takeProfit[0]?.pipsOrPoints} {pipUnit}
+            <span className="text-[9px] text-emerald-300 font-mono font-bold bg-emerald-500/20 px-1 py-0.2 rounded">
+              +{targetRoe}% ROE
             </span>
           </div>
           <div className="text-base font-extrabold font-mono text-emerald-300 tabular-nums">
-            ${signal.takeProfit[0]?.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ${formatPrice(tp1Price)}
           </div>
         </div>
 
@@ -224,12 +217,12 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
               <ShieldAlert className="w-3 h-3 text-rose-400" />
               <span>STOP LOSS (SL)</span>
             </span>
-            <span className="text-[9px] text-rose-400/80 font-mono">
-              R:R {signal.stopLoss?.riskRewardRatio || '1:2.0'}
+            <span className="text-[9px] text-rose-300 font-mono font-bold bg-rose-500/20 px-1 py-0.2 rounded">
+              {slRoe}% ROE
             </span>
           </div>
           <div className="text-base font-extrabold font-mono text-rose-300 tabular-nums">
-            ${slPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ${formatPrice(slPrice)}
           </div>
         </div>
       </div>

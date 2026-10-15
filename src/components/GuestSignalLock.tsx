@@ -1,5 +1,5 @@
 import React from 'react';
-import { Lock, Sparkles, KeyRound, QrCode } from 'lucide-react';
+import { Lock, Sparkles, KeyRound, Coins } from 'lucide-react';
 
 interface GuestSignalLockProps {
   onOpenAccessModal: () => void;
@@ -27,8 +27,8 @@ export const GuestSignalLock: React.FC<GuestSignalLockProps> = ({
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
           </div>
           <div className="text-[10px] text-teal-400/90 flex items-center gap-1 mt-0.5">
-            <QrCode className="w-3 h-3 text-teal-300" />
-            <span>Instant Activation via QRIS & USDT</span>
+            <Coins className="w-3 h-3 text-teal-300" />
+            <span>Instant Activation via USDT (TRC-20 & BEP-20)</span>
           </div>
         </div>
       </button>

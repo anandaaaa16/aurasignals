@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   AssetSymbol,
   MarketTicker,
-  Timeframe,
+  SignalData,
 } from '../types';
 import {
   TrendingUp,
@@ -11,16 +11,21 @@ import {
   Activity,
   Compass,
   ShieldAlert,
-  Lock,
   Sparkles,
   BarChart,
-  Eye,
+  Radio,
+  ArrowUpRight,
+  ArrowDownRight,
+  Newspaper,
+  CheckCircle2,
+  Lock,
 } from 'lucide-react';
 
 interface AnalyticChartsViewProps {
   selectedAsset: AssetSymbol;
   onSelectAsset: (asset: AssetSymbol) => void;
   currentTicker: MarketTicker | null;
+  activeSignal?: SignalData | null;
   userRole?: 'GUEST' | 'MEMBER' | 'ADMIN';
   onOpenVipModal: () => void;
 }
@@ -29,90 +34,101 @@ export const AnalyticChartsView: React.FC<AnalyticChartsViewProps> = ({
   selectedAsset,
   onSelectAsset,
   currentTicker,
+  activeSignal,
   userRole = 'GUEST',
   onOpenVipModal,
 }) => {
-  const [activeTf, setActiveTf] = useState<Timeframe>('1h');
   const isGuest = userRole === 'GUEST';
 
   const price = currentTicker?.price || (selectedAsset === 'BTC/USDT' ? 83200 : selectedAsset === 'ETH/USDT' ? 2540 : 1.38);
-  const isUp = (currentTicker?.change24h || 0) >= 0;
+  const changePct = currentTicker?.changePercent ?? 0;
+  const isUp = changePct > 0;
 
   // Format price helper
-  const fmt = (p: number) => {
+  const fmt = (p?: number) => {
+    if (!p) return '---';
     if (selectedAsset === 'XRP/USDT') return p.toFixed(4);
     if (selectedAsset === 'ETH/USDT') return p.toFixed(2);
     return p.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
   };
 
-  // Dynamic Strategy & Technical SMC Analytics based on asset & timeframe
+  // Check if there is an active open position for this asset
+  const isOpenPosition = Boolean(activeSignal && activeSignal.status === 'RUNNING');
+  const isBuy = activeSignal?.signal.includes('BUY') ?? true;
+  const entryPrice = activeSignal ? (activeSignal.entryPrice || (activeSignal.entryRange.min + activeSignal.entryRange.max) / 2) : price;
+  const tp1Price = activeSignal?.takeProfit?.[0]?.price;
+  const tp2Price = activeSignal?.takeProfit?.[1]?.price;
+  const slPrice = activeSignal?.stopLoss?.price;
+  const targetRoe = activeSignal?.takeProfit?.[0]?.targetRoePercent || 25.0;
+  const slRoe = activeSignal?.stopLoss?.slRoePercent || -10.0;
+
+  // Real-time floating ROE and dollar gain calculation for open position
+  const roePercent = useMemo(() => {
+    if (!isOpenPosition || !entryPrice || entryPrice <= 0) return 0;
+    const diff = (price - entryPrice) * (isBuy ? 1 : -1);
+    // 10x leverage multiplier
+    return (diff / entryPrice) * 10 * 100;
+  }, [isOpenPosition, entryPrice, price, isBuy]);
+
+  const isPosProfit = roePercent >= 0;
+  const floatingDollar = 150.0 * (roePercent / 100);
+
+  // Dynamic Technical & SMC Analytics for the current asset
   const analysis = useMemo(() => {
     if (selectedAsset === 'BTC/USDT') {
       return {
-        bias: 'Bullish Expansion' as const,
-        trendStrength: 88,
-        rsi: 62.4,
-        rsiSignal: 'Bullish Momentum',
-        macdSignal: 'Positive Histogram Expansion',
-        emaStatus: 'Price Above EMA-20 & EMA-50 (Golden Alignment)',
-        orderBlock: `$${(price * 0.985).toFixed(0)} - $${(price * 0.992).toFixed(0)} (H1 Demand Zone)`,
+        bias: isBuy ? 'Bullish Expansion' : 'Bearish Distribution',
+        trendStrength: 92,
+        rsi: 63.4,
+        rsiSignal: 'Bullish Momentum Divergence',
+        macdSignal: 'Positive Histogram Expansion (+18.4 Delta)',
+        emaStatus: 'Golden Alignment (EMA-20 > EMA-50 > EMA-200)',
+        orderBlock: `$${(price * 0.985).toFixed(0)} - $${(price * 0.992).toFixed(0)} (Institutional Demand Block)`,
         fvgZone: `$${(price * 1.012).toFixed(0)} - $${(price * 1.018).toFixed(0)} (Upper Imbalance)`,
         bslTarget: `$${(price * 1.025).toFixed(0)} (Buy-side Liquidity Pool)`,
-        sslInvalidation: `$${(price * 0.978).toFixed(0)} (Structural Invalidation)`,
-        strategyName: 'Institutional Liquidity Sweeps & FVG Mitigation',
-        strategyRationale:
-          'Bitcoin successfully swept Asian session sell-side liquidity and closed above the dynamic H1 value area. Institutional volume delta indicates aggressive absorption of limit orders at support, with targets set at local liquidity pools.',
-        riskReward: '1 : 2.45',
-        volumeFlow: 'Institutions Net Accumulating (+14.2% Delta)',
-        invalidationRule: 'Close below H1 swing low invalidates immediate bullish expansion.',
+        sslInvalidation: `$${(price * 0.978).toFixed(0)} (Structural SL Guard)`,
+        volumeFlow: 'Institutions Net Accumulating (+18.2% Delta)',
+        orderBookImbalance: '2.6 : 1 (Dominasi Limit Buy Bid vs Ask)',
       };
     } else if (selectedAsset === 'ETH/USDT') {
       return {
-        bias: 'Bullish Expansion' as const,
-        trendStrength: 84,
-        rsi: 58.2,
-        rsiSignal: 'Neutral-Bullish Consolidation',
-        macdSignal: 'MACD Bullish Cross Confirmed',
-        emaStatus: 'Testing Dynamic EMA-20 Resistance',
-        orderBlock: `$${(price * 0.982).toFixed(1)} - $${(price * 0.99).toFixed(1)} (Daily S/R Flip)`,
-        fvgZone: `$${(price * 1.015).toFixed(1)} - $${(price * 1.024).toFixed(1)} (4H Fair Value Gap)`,
+        bias: isBuy ? 'Bullish Expansion' : 'Bearish Distribution',
+        trendStrength: 88,
+        rsi: 59.1,
+        rsiSignal: 'Bullish Momentum Continuation',
+        macdSignal: 'Bullish Crossover Confirmed',
+        emaStatus: 'Holding Dynamic EMA-20 Value Support',
+        orderBlock: `$${(price * 0.982).toFixed(1)} - $${(price * 0.99).toFixed(1)} (Daily S/R Demand)`,
+        fvgZone: `$${(price * 1.015).toFixed(1)} - $${(price * 1.024).toFixed(1)} (Upper Imbalance FVG)`,
         bslTarget: `$${(price * 1.032).toFixed(1)} (Major Swing High Liquidity)`,
-        sslInvalidation: `$${(price * 0.974).toFixed(1)} (Range Low Invalidation)`,
-        strategyName: 'Range Reclaim & Ethereum Network Gas Flow Surge',
-        strategyRationale:
-          'Ethereum maintains strong structural confluence at the mid-range point. L2 network activity and steady staking inflows have formed a robust consolidation base, anticipating a breakout towards the upper balance zone.',
-        riskReward: '1 : 2.30',
-        volumeFlow: 'Steady Spot Inflows (+8.7% Delta)',
-        invalidationRule: 'Breakdown of demand block requires re-evaluation at lower support.',
+        sslInvalidation: `$${(price * 0.974).toFixed(1)} (Support Invalidation)`,
+        volumeFlow: 'Spot Inflows Steady (+12.4% Delta)',
+        orderBookImbalance: '2.1 : 1 (Net Bids Dominant)',
       };
     } else {
       // XRP/USDT
       return {
-        bias: 'Bullish Expansion' as const,
-        trendStrength: 86,
-        rsi: 64.8,
-        rsiSignal: 'Strong Trend Momentum',
-        macdSignal: 'Bullish Momentum Divergence',
-        emaStatus: 'Stacked EMAs (20 > 50 > 200 Exponential Slope)',
+        bias: isBuy ? 'Bullish Expansion' : 'Bearish Distribution',
+        trendStrength: 94,
+        rsi: 66.8,
+        rsiSignal: 'Strong Breakout Momentum',
+        macdSignal: 'Accelerating Bullish Wave',
+        emaStatus: 'Stacked EMAs with Rising Slope Angle',
         orderBlock: `$${(price * 0.975).toFixed(4)} - $${(price * 0.985).toFixed(4)} (Institutional Base)`,
         fvgZone: `$${(price * 1.018).toFixed(4)} - $${(price * 1.028).toFixed(4)} (Expansion Pocket)`,
         bslTarget: `$${(price * 1.045).toFixed(4)} (Breakout Liquidity Target)`,
-        sslInvalidation: `$${(price * 0.965).toFixed(4)} (Structural Stop)`,
-        strategyName: 'High-Volume Breakout & Cross-Border Liquidity Surge',
-        strategyRationale:
-          'XRP exhibits exceptional volume expansion with continuous accumulation above prior multi-week resistance. Smart money is defending higher lows on the 15M/1H charts with minimal slippage.',
-        riskReward: '1 : 2.60',
-        volumeFlow: 'Heavy Spot & Perp Buying (+22.1% Delta)',
-        invalidationRule: 'Loss of local volume support triggers temporary capital defense.',
+        sslInvalidation: `$${(price * 0.965).toFixed(4)} (Structure Invalidation)`,
+        volumeFlow: 'Heavy Spot & Perp Inflows (+24.6% Delta)',
+        orderBookImbalance: '2.8 : 1 (Heavy Whale Bid Absorption)',
       };
     }
-  }, [selectedAsset, price]);
+  }, [selectedAsset, price, isBuy]);
 
   // Synthetic smooth candlestick/bar SVG visualization
   const chartPoints = useMemo(() => {
     const pts = [];
     const base = price;
-    const volatility = selectedAsset === 'BTC/USDT' ? 400 : selectedAsset === 'ETH/USDT' ? 18 : 0.012;
+    const volatility = selectedAsset === 'BTC/USDT' ? 380 : selectedAsset === 'ETH/USDT' ? 18 : 0.012;
     for (let i = 0; i < 24; i++) {
       const angle = (i / 24) * Math.PI * 2.5;
       const wave = Math.sin(angle) * volatility;
@@ -129,6 +145,35 @@ export const AnalyticChartsView: React.FC<AnalyticChartsViewProps> = ({
     return pts;
   }, [selectedAsset, price]);
 
+  // Scale calculations for price lines on chart
+  const { maxPrice, minPrice } = useMemo(() => {
+    let max = -Infinity;
+    let min = Infinity;
+    chartPoints.forEach((p) => {
+      max = Math.max(max, p.high);
+      min = Math.min(min, p.low);
+    });
+    if (tp1Price) max = Math.max(max, tp1Price);
+    if (slPrice) min = Math.min(min, slPrice);
+    if (entryPrice) {
+      max = Math.max(max, entryPrice);
+      min = Math.min(min, entryPrice);
+    }
+    return { maxPrice: max, minPrice: min };
+  }, [chartPoints, tp1Price, slPrice, entryPrice]);
+
+  const priceRange = maxPrice - minPrice || 1;
+  const getLineTopPercent = (p?: number) => {
+    if (!p) return null;
+    const clamped = Math.max(minPrice, Math.min(maxPrice, p));
+    const pct = 100 - ((clamped - minPrice) / priceRange) * 85 - 8;
+    return Math.max(4, Math.min(94, pct));
+  };
+
+  const entryLineTop = getLineTopPercent(entryPrice);
+  const tp1LineTop = getLineTopPercent(tp1Price);
+  const slLineTop = getLineTopPercent(slPrice);
+
   return (
     <div className="space-y-4 animate-in fade-in pb-20">
       {/* 1. Header with Asset Switcher & Live Price */}
@@ -137,7 +182,7 @@ export const AnalyticChartsView: React.FC<AnalyticChartsViewProps> = ({
           <div className="flex items-center gap-2">
             <BarChart className="w-5 h-5 text-teal-400" />
             <h2 className="font-extrabold text-base sm:text-lg text-white font-mono tracking-wide">
-              Analytic Charts
+              Chart & Analisis Sinyal
             </h2>
           </div>
 
@@ -149,6 +194,7 @@ export const AnalyticChartsView: React.FC<AnalyticChartsViewProps> = ({
               return (
                 <button
                   key={sym}
+                  type="button"
                   onClick={() => onSelectAsset(sym)}
                   className={`px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                     isSelected
@@ -163,14 +209,14 @@ export const AnalyticChartsView: React.FC<AnalyticChartsViewProps> = ({
           </div>
         </div>
 
-        {/* Live Price & Timeframe Bar */}
+        {/* Live Price & Live Position Status Badge (No 15M/1H/4H timeframe picker) */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <div className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight">
               ${fmt(price)}
             </div>
             <div className="flex items-center gap-1.5 text-xs font-mono">
-              <span className={isUp ? 'text-emerald-400' : 'text-rose-400'}>
+              <span className={isUp ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
                 {isUp ? '▲ +' : '▼ '}{currentTicker?.changePercent?.toFixed(2) || '0.00'}% 24h
               </span>
               <span className="text-slate-500">·</span>
@@ -178,44 +224,43 @@ export const AnalyticChartsView: React.FC<AnalyticChartsViewProps> = ({
             </div>
           </div>
 
-          {/* Timeframe Selector */}
-          <div className="flex gap-1 p-1 rounded-xl bg-slate-900/80 border border-white/5 font-mono text-xs">
-            {(['15m', '1h', '4h', '1d'] as Timeframe[]).map((tf) => (
-              <button
-                key={tf}
-                onClick={() => setActiveTf(tf)}
-                className={`px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
-                  activeTf === tf
-                    ? 'bg-teal-500/30 text-teal-300 border border-teal-400/40'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {tf.toUpperCase()}
-              </button>
-            ))}
-          </div>
+          {/* Position Status Banner in place of old timeframe buttons */}
+          {isOpenPosition ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 font-mono text-xs font-bold text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400" />
+              <span>POSISI TERBUKA: {isBuy ? 'LONG' : 'SHORT'}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-teal-500/20 font-mono text-xs font-semibold text-slate-400">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span>AI SCANNING MOMENTUM</span>
+            </div>
+          )}
         </div>
 
-        {/* Interactive Candlestick / Indicator Simulation Viewport */}
+        {/* Interactive Candlestick Chart Viewport with Position Overlay Lines */}
         <div className="p-3 rounded-2xl bg-slate-950/80 border border-teal-500/20 relative overflow-hidden">
-          {/* Indicator badges */}
+          {/* Top Indicator Badges */}
           <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-2">
             <div className="flex gap-2">
-              <span className="text-cyan-400">EMA(20): Bullish</span>
-              <span className="text-teal-400">EMA(50): Support</span>
-              <span className="text-amber-400">EMA(200): Trend Base</span>
+              <span className="text-cyan-400">EMA(20): {analysis.bias}</span>
+              <span className="text-teal-400">EMA(50): Value Support</span>
+              <span className="text-amber-400">SMC: Breaker Block</span>
             </div>
             <span className="text-emerald-400 font-bold">RSI(14): {analysis.rsi}</span>
           </div>
 
           {/* SVG Candlestick Graphic */}
-          <div className="h-44 sm:h-52 w-full flex items-center justify-between gap-1 px-1">
+          <div className="h-44 sm:h-52 w-full flex items-center justify-between gap-1 px-1 relative">
             {chartPoints.map((pt, idx) => {
               const isGreen = pt.close >= pt.open;
-              const range = chartPoints.reduce((acc, p) => ({
-                max: Math.max(acc.max, p.high),
-                min: Math.min(acc.min, p.low),
-              }), { max: -Infinity, min: Infinity });
+              const range = chartPoints.reduce(
+                (acc, p) => ({
+                  max: Math.max(acc.max, p.high),
+                  min: Math.min(acc.min, p.low),
+                }),
+                { max: -Infinity, min: Infinity }
+              );
               const span = range.max - range.min || 1;
               const scaleY = (val: number) => 100 - ((val - range.min) / span) * 85 - 8;
 
@@ -239,7 +284,9 @@ export const AnalyticChartsView: React.FC<AnalyticChartsViewProps> = ({
                   {/* Body */}
                   <div
                     className={`w-full max-w-[8px] rounded-[1px] z-10 ${
-                      isGreen ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.3)]' : 'bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.3)]'
+                      isGreen
+                        ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.3)]'
+                        : 'bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.3)]'
                     }`}
                     style={{
                       top: `${barTop}%`,
@@ -250,149 +297,253 @@ export const AnalyticChartsView: React.FC<AnalyticChartsViewProps> = ({
                 </div>
               );
             })}
+
+            {/* Position Price Lines Overlay if Open Position Exists */}
+            {isOpenPosition && (
+              <>
+                {/* Take Profit Line */}
+                {tp1LineTop !== null && (
+                  <div
+                    className="absolute left-0 right-0 border-t border-dashed border-emerald-400/80 z-20 flex items-center justify-end pr-2 pointer-events-none"
+                    style={{ top: `${tp1LineTop}%` }}
+                  >
+                    <span className="text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-1.5 py-0.2 rounded -mt-2.5 shadow-sm">
+                      TP 1: ${fmt(tp1Price)} (+{targetRoe}%)
+                    </span>
+                  </div>
+                )}
+
+                {/* Entry Price Line */}
+                {entryLineTop !== null && (
+                  <div
+                    className="absolute left-0 right-0 border-t border-teal-400/90 z-20 flex items-center justify-start pl-2 pointer-events-none"
+                    style={{ top: `${entryLineTop}%` }}
+                  >
+                    <span className="text-[9px] font-mono font-bold bg-teal-500/25 text-teal-200 border border-teal-400/40 px-1.5 py-0.2 rounded -mt-2.5 shadow-sm">
+                      Entry {isGuest ? '••••••' : `$${fmt(entryPrice)}`}
+                    </span>
+                  </div>
+                )}
+
+                {/* Stop Loss Line */}
+                {slLineTop !== null && (
+                  <div
+                    className="absolute left-0 right-0 border-t border-dashed border-rose-400/80 z-20 flex items-center justify-end pr-2 pointer-events-none"
+                    style={{ top: `${slLineTop}%` }}
+                  >
+                    <span className="text-[9px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-400/30 px-1.5 py-0.2 rounded -mt-2.5 shadow-sm">
+                      SL: ${fmt(slPrice)} ({slRoe}%)
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
-          {/* Real-time Order Block Overlay Lines */}
+          {/* Bottom Chart Status Bar */}
           <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-slate-400">
             <span className="flex items-center gap-1 text-emerald-300">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              SMC Demand OB: {analysis.orderBlock}
+              Demand OB: {analysis.orderBlock}
             </span>
-            <span className="text-slate-500">{activeTf.toUpperCase()} Institutional Chart</span>
+            <span className="text-slate-500 font-bold">AI Execution Engine</span>
           </div>
         </div>
       </div>
 
-      {/* 2. Technical Indicators Dashboard */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono">
-        <div className="glass-panel p-3 rounded-2xl border border-teal-500/20 text-center space-y-1">
-          <span className="text-[10px] text-slate-400 block">Market Bias</span>
-          <div className="text-xs sm:text-sm font-black text-emerald-400 flex items-center justify-center gap-1">
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>{analysis.bias}</span>
-          </div>
-        </div>
-
-        <div className="glass-panel p-3 rounded-2xl border border-teal-500/20 text-center space-y-1">
-          <span className="text-[10px] text-slate-400 block">RSI Momentum</span>
-          <div className="text-xs sm:text-sm font-black text-teal-300">
-            {analysis.rsi} · {analysis.rsiSignal}
-          </div>
-        </div>
-
-        <div className="glass-panel p-3 rounded-2xl border border-teal-500/20 text-center space-y-1">
-          <span className="text-[10px] text-slate-400 block">Volume Delta</span>
-          <div className="text-xs sm:text-sm font-black text-cyan-300">
-            {analysis.volumeFlow}
-          </div>
-        </div>
-
-        <div className="glass-panel p-3 rounded-2xl border border-teal-500/20 text-center space-y-1">
-          <span className="text-[10px] text-slate-400 block">Target RR Ratio</span>
-          <div className="text-xs sm:text-sm font-black text-amber-300">
-            {analysis.riskReward}
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Deep Institutional Strategy & SMC Breakdown */}
-      <div className="glass-panel rounded-3xl p-4 sm:p-5 border border-teal-500/25 space-y-3.5 relative overflow-hidden backdrop-blur-2xl">
-        <div className="flex items-center justify-between border-b border-teal-500/15 pb-2.5">
-          <div className="flex items-center gap-2">
-            <Compass className="w-4 h-4 text-amber-400" />
-            <h3 className="font-extrabold text-sm sm:text-base text-white font-mono">
-              AI Strategy & Execution Blueprint
-            </h3>
-          </div>
-          <span className="text-[10px] font-mono text-teal-300 bg-teal-500/15 border border-teal-500/30 px-2 py-0.5 rounded-lg font-bold">
-            {analysis.strategyName}
-          </span>
-        </div>
-
-        {/* If Guest: Blur the detailed institutional strategy so guests cannot copy institutional secrets without VIP! */}
-        {isGuest ? (
-          <div className="relative py-2">
-            {/* Frosted Glass VIP Lock Overlay */}
-            <div className="absolute inset-0 z-20 backdrop-blur-md bg-slate-950/75 rounded-2xl flex flex-col items-center justify-center p-4 text-center space-y-2 border border-teal-500/30">
-              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shadow-lg shadow-amber-500/15">
-                <Lock className="w-5 h-5 text-amber-400" />
+      {/* 2. PENJELASAN ANALISIS SAAT OPEN POSISI (DEDICATED POSITION BREAKDOWN) */}
+      {isOpenPosition ? (
+        <div className="glass-panel rounded-3xl p-4 sm:p-5 border border-teal-500/30 shadow-2xl space-y-4 backdrop-blur-2xl">
+          {/* Card Header: Open Position Title & Floating ROE */}
+          <div className="flex items-center justify-between border-b border-teal-500/15 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div
+                className={`p-2 rounded-xl flex items-center justify-center ${
+                  isBuy
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                }`}
+              >
+                {isBuy ? (
+                  <ArrowUpRight className="w-5 h-5 stroke-[2.5]" />
+                ) : (
+                  <ArrowDownRight className="w-5 h-5 stroke-[2.5]" />
+                )}
               </div>
               <div>
-                <div className="font-mono text-sm font-bold text-white flex items-center justify-center gap-1.5">
-                  <span>Join VIP for Full Strategy Access</span>
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white font-mono">
+                    Penjelasan Analisis Open Posisi
+                  </h3>
+                  <span
+                    className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg border ${
+                      isBuy
+                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                        : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                    }`}
+                  >
+                    {isBuy ? 'LONG (Beli)' : 'SHORT (Jual)'} {selectedAsset}
+                  </span>
                 </div>
-                <p className="text-xs text-slate-400 font-sans max-w-xs mx-auto mt-0.5">
-                  Unlock institutional order flow, exact liquidity targets, order blocks, and invalidation levels.
-                </p>
+                <div className="text-xs font-mono text-slate-400 mt-0.5">
+                  10x Leverage Multiplier · Sinyal Aktif
+                </div>
               </div>
-
-              <button
-                type="button"
-                onClick={onOpenVipModal}
-                className="px-5 py-2 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 font-bold font-mono text-xs shadow-lg shadow-teal-500/20 active:scale-95 cursor-pointer transition-all"
-              >
-                Upgrade to VIP Member (QRIS / USDT)
-              </button>
             </div>
 
-            {/* Blurred background preview */}
-            <div className="filter blur-[5px] select-none pointer-events-none opacity-40 space-y-3 font-mono text-xs">
-              <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/5 space-y-1">
-                <span className="text-slate-400 block text-[10px]">Institutional Order Flow Rationale:</span>
-                <p className="text-slate-200">{analysis.strategyRationale}</p>
+            {/* Live Floating Profit / Loss */}
+            <div className="text-right font-mono">
+              <span className="text-[10px] text-slate-400 block">Floating Profit</span>
+              <div
+                className={`text-sm sm:text-base font-black tabular-nums tracking-tight ${
+                  isPosProfit ? 'text-emerald-400' : 'text-rose-400'
+                }`}
+              >
+                {isPosProfit ? '+' : '-'}${Math.abs(floatingDollar).toFixed(2)}
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
-                  <span className="text-slate-500 block">Buy-Side Liquidity:</span>
-                  <span className="text-emerald-400 font-bold">{analysis.bslTarget}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
-                  <span className="text-slate-500 block">Invalidation Level:</span>
-                  <span className="text-rose-400 font-bold">{analysis.sslInvalidation}</span>
-                </div>
+              <div
+                className={`text-[10px] font-bold ${
+                  isPosProfit ? 'text-emerald-400/90' : 'text-rose-400/90'
+                }`}
+              >
+                {isPosProfit ? '+' : ''}{roePercent.toFixed(1)}% ROE
               </div>
             </div>
           </div>
-        ) : (
-          /* VIP & Admin full strategy display */
-          <div className="space-y-3 font-mono text-xs">
-            <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-teal-500/20 space-y-1.5">
+
+          {/* Key Execution Metrics Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs">
+            {/* Entry Price */}
+            <div className="p-2.5 rounded-2xl bg-slate-900/70 border border-teal-500/20">
+              <span className="text-[10px] text-slate-400 block mb-0.5">Harga Entry:</span>
+              {isGuest ? (
+                <div className="flex items-center gap-1 font-bold text-amber-300">
+                  <span className="tracking-widest">••••••</span>
+                  <Lock className="w-3 h-3 text-amber-400" />
+                </div>
+              ) : (
+                <div className="font-black text-white">${fmt(entryPrice)}</div>
+              )}
+            </div>
+
+            {/* Current Price */}
+            <div className="p-2.5 rounded-2xl bg-slate-900/70 border border-teal-500/20">
+              <span className="text-[10px] text-slate-400 block mb-0.5">Harga Sekarang:</span>
+              <div className="font-black text-cyan-300">${fmt(price)}</div>
+            </div>
+
+            {/* Target TP 1 */}
+            <div className="p-2.5 rounded-2xl bg-slate-900/70 border border-emerald-500/20">
+              <span className="text-[10px] text-slate-400 block mb-0.5">Target TP 1:</span>
+              <div className="font-black text-emerald-400">
+                ${fmt(tp1Price)} <span className="text-[10px] font-normal">(+{targetRoe}%)</span>
+              </div>
+            </div>
+
+            {/* Invalidation SL */}
+            <div className="p-2.5 rounded-2xl bg-slate-900/70 border border-rose-500/20">
+              <span className="text-[10px] text-slate-400 block mb-0.5">Stop Loss (SL):</span>
+              <div className="font-black text-rose-400">
+                ${fmt(slPrice)} <span className="text-[10px] font-normal">({slRoe}%)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 1. Alasan Teknikal Mengapa AI Membuka Posisi */}
+          <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-teal-500/20 space-y-2 font-mono">
+            <div className="flex items-center gap-1.5 text-teal-300 font-bold text-xs">
+              <Compass className="w-4 h-4 text-teal-400" />
+              <span>Alasan AI Mengambil Posisi {isBuy ? 'LONG' : 'SHORT'}:</span>
+            </div>
+            <p className="text-slate-200 leading-relaxed font-sans text-xs">
+              {activeSignal?.technicalConfluence?.join(' ') ||
+                `AI mendeteksi formasi konfirmasi ${isBuy ? 'Bullish' : 'Bearish'} yang kuat pada ${selectedAsset}. Terjadi penyerapan likuiditas order book di area demand institusional, didukung oleh peningkatan agresif volume delta dan divergensi RSI momentum.`}
+            </p>
+          </div>
+
+          {/* 2. Katalis Berita & Momentum Fundamental */}
+          {activeSignal?.newsCatalyst && (
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-1.5 font-mono">
               <div className="flex items-center gap-1.5 text-amber-300 font-bold text-xs">
-                <Layers className="w-3.5 h-3.5" />
-                <span>Institutional Market Rationale:</span>
+                <Newspaper className="w-3.5 h-3.5" />
+                <span>Katalis Momentum & On-Chain News:</span>
               </div>
               <p className="text-slate-300 leading-relaxed font-sans text-xs">
-                {analysis.strategyRationale}
+                {activeSignal.newsCatalyst}
               </p>
             </div>
+          )}
 
-            {/* Key Structural SMC Levels */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
-              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-emerald-500/20 space-y-0.5">
-                <span className="text-slate-400 block text-[10px]">Buy-Side Liquidity (BSL):</span>
-                <span className="text-emerald-400 font-bold">{analysis.bslTarget}</span>
+          {/* 3. Konfirmasi Indikator Teknikal Real-Time */}
+          <div className="space-y-1.5 font-mono">
+            <span className="text-[11px] text-slate-400 font-bold block">
+              Konfirmasi Indikator Saat Open Posisi:
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 space-y-0.5">
+                <span className="text-slate-400 block text-[10px]">RSI Momentum:</span>
+                <span className="text-emerald-400 font-bold">{analysis.rsi} · {analysis.rsiSignal}</span>
               </div>
-
-              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-teal-500/20 space-y-0.5">
-                <span className="text-slate-400 block text-[10px]">Institutional Demand OB:</span>
-                <span className="text-teal-300 font-bold">{analysis.orderBlock}</span>
+              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 space-y-0.5">
+                <span className="text-slate-400 block text-[10px]">Volume Flow Delta:</span>
+                <span className="text-cyan-300 font-bold">{analysis.volumeFlow}</span>
               </div>
-
-              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-rose-500/20 space-y-0.5">
-                <span className="text-slate-400 block text-[10px]">Strict Invalidation Stop:</span>
-                <span className="text-rose-400 font-bold">{analysis.sslInvalidation}</span>
+              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 space-y-0.5">
+                <span className="text-slate-400 block text-[10px]">Order Book Imbalance:</span>
+                <span className="text-amber-300 font-bold">{analysis.orderBookImbalance}</span>
               </div>
-            </div>
-
-            {/* Risk Control Note */}
-            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px]">
-              <ShieldAlert className="w-4 h-4 shrink-0" />
-              <span>{analysis.invalidationRule}</span>
             </div>
           </div>
-        )}
-      </div>
+
+          {/* 4. Aturan Manajemen Risiko & Invalidation */}
+          <div className="p-2.5 rounded-xl bg-slate-950/80 border border-teal-500/20 text-slate-300 text-xs flex items-center gap-2 font-mono">
+            <ShieldAlert className="w-4 h-4 text-teal-400 shrink-0" />
+            <span>
+              <strong>Manajemen Risiko:</strong> Rasio Risk:Reward {activeSignal?.stopLoss?.riskRewardRatio || '1 : 2.5+'}. Posisi otomatis tertutup saat menyentuh TP (+{targetRoe}% ROE) atau ter-invalidasi ketat di SL ({slRoe}% ROE).
+            </span>
+          </div>
+        </div>
+      ) : (
+        /* Standby / Scanning State when No Active Position */
+        <div className="glass-panel rounded-3xl p-5 border border-teal-500/25 shadow-2xl space-y-3.5 backdrop-blur-2xl">
+          <div className="flex items-center gap-2 border-b border-teal-500/15 pb-2.5">
+            <Radio className="w-4 h-4 text-amber-400 animate-pulse" />
+            <h3 className="font-extrabold text-sm sm:text-base text-white font-mono">
+              Status Bot: Standby & Scanning Pasar
+            </h3>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-white/5 space-y-2 font-mono text-xs">
+            <p className="text-slate-300 font-sans leading-relaxed">
+              Saat ini belum ada open posisi untuk <strong>{selectedAsset}</strong>. AI Bot sedang memindai volume profile, order book depth, dan likuiditas swing high/low 24/7.
+            </p>
+            <div className="flex items-center gap-2 text-teal-300 text-[11px] pt-1">
+              <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
+              <span>Posisi hanya akan dibuka saat konfirmasi teknikal terpenuhi dengan Risk:Reward minimal 1:2.5.</span>
+            </div>
+          </div>
+
+          {/* Market Overview Grid during Standby */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs text-center">
+            <div className="p-2.5 rounded-xl bg-slate-900/50 border border-teal-500/15">
+              <span className="text-[10px] text-slate-400 block">Market Bias</span>
+              <span className="font-bold text-emerald-400">{analysis.bias}</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-slate-900/50 border border-teal-500/15">
+              <span className="text-[10px] text-slate-400 block">RSI Status</span>
+              <span className="font-bold text-teal-300">{analysis.rsi}</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-slate-900/50 border border-teal-500/15">
+              <span className="text-[10px] text-slate-400 block">Volume Delta</span>
+              <span className="font-bold text-cyan-300">{analysis.volumeFlow.split(' ')[0]} Flow</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-slate-900/50 border border-teal-500/15">
+              <span className="text-[10px] text-slate-400 block">Min Risk:Reward</span>
+              <span className="font-bold text-amber-300">1 : 2.5+</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

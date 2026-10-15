@@ -23,7 +23,9 @@ export interface MarketTicker {
   low24h: number;
   bid: number;
   ask: number;
-  spread: number;
+  spread?: number;
+  fundingRate?: number; // e.g. +0.0100% (Crypto Futures)
+  openInterest?: string; // e.g. "$1.42B"
   dxyImpact?: string;
   volume24h?: number;
   candles: Candle[];
@@ -33,7 +35,8 @@ export interface MarketTicker {
 export interface TakeProfitTarget {
   target: string;
   price: number;
-  pipsOrPoints: number;
+  targetRoePercent?: number; // e.g. +25.0% ROE at 10x leverage
+  pipsOrPoints?: number; // legacy points distance for backward compatibility
 }
 
 export interface SignalData {
@@ -45,6 +48,10 @@ export interface SignalData {
   confidencePercent: number;
   timeHorizon: string;
   orderType: string;
+  leverageMultiplier: number; // Default 10x Leverage Multiplier
+  marginMode?: 'ISOLATED' | 'CROSS';
+  recommendedMarginUsdt?: number; // e.g. $150 USDT per trade (2% risk guard)
+  targetRoePercent?: number; // Expected ROE % e.g. +25.0%
   entryPrice?: number;
   entryCandleTime?: number;
   timeDuration?: {
@@ -57,7 +64,8 @@ export interface SignalData {
   takeProfit: TakeProfitTarget[];
   stopLoss: {
     price: number;
-    pipsOrPoints: number;
+    slRoePercent?: number; // e.g. -10.0% ROE
+    pipsOrPoints?: number;
     riskRewardRatio: string;
   };
   technicalConfluence: string[];
@@ -68,21 +76,26 @@ export interface SignalData {
     marketBias: 'Bullish Expansion' | 'Bearish Liquidity Run' | 'Range Compression';
   };
   macroeconomicCatalyst: string;
+  newsCatalyst?: string; // High-impact live news catalyst
   riskManagementNote: string;
   status: 'RUNNING' | 'HIT_TP' | 'HIT_SL';
 }
 
 export interface ClosedTrade {
   id: string;
-  dateStr: string; // e.g. '2026-10-10'
-  timeStr: string; // e.g. '14:25 WIB'
+  dateStr: string; // e.g. '2026-10-15'
+  timeStr: string; // e.g. '14:25 UTC'
   asset: AssetSymbol;
   direction: 'BUY' | 'SELL';
   entryPrice: number;
   exitPrice: number;
   hitType: 'HIT_TP' | 'HIT_SL';
+  leverage?: number; // 10x
+  marginUsdt?: number; // $150 USDT
+  gainUsdt?: number; // Realized dollar gain/loss
+  roePercent?: number; // ROE % at 10x leverage
   pnlPercent: number; // positive for TP, negative for SL
-  pnlPips: number; // positive for TP, negative for SL
+  pnlPips: number; // points moved
   waveTrajectory: number[]; // continuous price values forming the wave curve
   timestamp: number;
 }
@@ -138,9 +151,9 @@ export interface AiTradeJournalEntry {
   confidence: number;
   setupRationale: string;
   riskGuard: {
-    maxCapitalRiskDollar: number; // e.g. 7.50 (1.5% of $500)
-    riskPercent: number; // 1.5%
-    targetRewardRatio: string; // '1:2.0'
+    maxCapitalRiskDollar: number; // 2% risk rule
+    riskPercent: number; // 2.0%
+    targetRewardRatio: string; // '1:2.5'
     invalidationPrice: number;
   };
   technicalEvidence: {
@@ -157,28 +170,35 @@ export interface VipPaymentRequest {
   userName: string;
   contact: string; // WhatsApp or Telegram
   plan: '1_MONTH' | '3_MONTHS' | 'LIFETIME';
-  method: 'QRIS' | 'USDT_TRC20' | 'USDT_BEP20';
-  amount: string; // e.g. "Rp 199.000" or "$15 USDT"
+  method: 'USDT_TRC20' | 'USDT_BEP20';
+  amount: string; // e.g. "$15 USDT"
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   txProofOrRef: string;
   createdAt: number;
   approvedPin?: string;
 }
 
+/**
+ * Crypto Futures Gain Calculation (10x Leverage Multiplier / $150 USDT Margin)
+ * ROE % = ((exit - entry) / entry) * direction * leverage * 100%
+ * Realized Gain $ = margin * (ROE % / 100)
+ */
 export function calculateTradeGain(trade: {
   asset: AssetSymbol;
   entryPrice: number;
   exitPrice: number;
   direction: 'BUY' | 'SELL';
+  gainUsdt?: number;
+  roePercent?: number;
 }): number {
-  const dir = trade.direction === 'BUY' ? 1 : -1;
-  const priceDiff = (trade.exitPrice - trade.entryPrice) * dir;
-  if (trade.asset === 'BTC/USDT') {
-    return priceDiff * 0.02; // 0.02 BTC ~$1,600 position
-  } else if (trade.asset === 'ETH/USDT') {
-    return priceDiff * 0.5; // 0.5 ETH ~$1,260 position
-  } else if (trade.asset === 'XRP/USDT') {
-    return priceDiff * 1000; // 1,000 XRP ~$1,380 position
+  if (typeof trade.gainUsdt === 'number' && !isNaN(trade.gainUsdt)) {
+    return trade.gainUsdt;
   }
-  return priceDiff * 0.02;
+  const dir = trade.direction === 'BUY' ? 1 : -1;
+  const priceMovePct = (trade.exitPrice - trade.entryPrice) / trade.entryPrice * dir;
+  const leverage = 10;
+  const marginPerTrade = 150.0; // $150 USDT standard margin
+  const roePct = priceMovePct * leverage;
+  const gain = marginPerTrade * roePct;
+  return Math.round(gain * 100) / 100;
 }

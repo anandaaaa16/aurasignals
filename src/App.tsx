@@ -316,12 +316,14 @@ export default function App() {
         const avgEntry = sig.entryPrice || (sig.entryRange.min + sig.entryRange.max) / 2;
         const exitPrice = isWin ? sig.takeProfit[0].price : sig.stopLoss.price;
 
-        const diff = isBuy ? exitPrice - avgEntry : avgEntry - exitPrice;
-        const pnlPercent = Math.round((diff / avgEntry) * 100 * 100) / 100;
-        const pnlPips =
-          asset === 'XRP/USDT'
-            ? Math.round(diff * 10000)
-            : Math.round(diff);
+        // 10x Crypto Futures ROE % and USDT Gain
+        const dir = isBuy ? 1 : -1;
+        const priceMovePct = avgEntry > 0 ? ((exitPrice - avgEntry) / avgEntry) * dir : 0;
+        const leverage = 10;
+        const marginUsdt = 150.0;
+        const roePercent = Math.round(priceMovePct * leverage * 100 * 10) / 10;
+        const gainUsdt = Math.round(marginUsdt * (roePercent / 100) * 100) / 100;
+        const pnlPips = Math.round(Math.abs(exitPrice - avgEntry));
 
         const now = new Date();
         const pad = (n: number) => String(n).padStart(2, '0');
@@ -339,7 +341,11 @@ export default function App() {
           entryPrice: avgEntry,
           exitPrice,
           hitType,
-          pnlPercent,
+          leverage,
+          marginUsdt,
+          gainUsdt,
+          roePercent,
+          pnlPercent: roePercent,
           pnlPips,
           waveTrajectory: wave,
           timestamp: Date.now(),
@@ -355,7 +361,7 @@ export default function App() {
 
         saveClosedTradeToCloud(closedTradeItem);
 
-        // AI Journal Audit
+        // AI Journal Audit with Crypto Futures Confluence
         const completedJournal: AiTradeJournalEntry = {
           id: `journal-eval-${Date.now()}`,
           timestamp: Date.now(),
@@ -364,23 +370,23 @@ export default function App() {
           action: isBuy ? 'BUY' : 'SELL',
           confidence: sig.confidencePercent || 88.5,
           setupRationale: isWin
-            ? `Target hit cleanly (+${Math.abs(pnlPips)} pts). Setup validated according to projected institutional liquidity.`
-            : `Invalidation reached (-${Math.abs(pnlPips)} pts). Hard Stop Loss protected trading capital under 1.5% max risk rule.`,
+            ? `Target hit cleanly (+${Math.abs(roePercent).toFixed(1)}% ROE · +$${Math.abs(gainUsdt).toFixed(2)} USDT). 10x Futures setup validated institutional order flow.`
+            : `Invalidation reached (-${Math.abs(roePercent).toFixed(1)}% ROE · -$${Math.abs(gainUsdt).toFixed(2)} USDT). Strict 2% margin risk management executed.`,
           riskGuard: {
-            maxCapitalRiskDollar: asset === 'BTC/USDT' ? Math.abs(diff) * 0.02 : asset === 'ETH/USDT' ? Math.abs(diff) * 0.5 : Math.abs(diff) * 1000,
-            riskPercent: 1.5,
-            targetRewardRatio: sig.stopLoss.riskRewardRatio || '1:2.0',
+            maxCapitalRiskDollar: Math.abs(gainUsdt),
+            riskPercent: 2.0,
+            targetRewardRatio: sig.stopLoss.riskRewardRatio || '1:2.5',
             invalidationPrice: exitPrice,
           },
           technicalEvidence: {
-            marketStructure: isWin ? 'Target Hit (Expansion Complete)' : 'Stop Out (Capital Protected)',
+            marketStructure: isWin ? '10x Target Hit (Liquidity Swept)' : 'Stop Out (Capital Protected)',
             keyLevel: `Exit Price $${exitPrice.toLocaleString()}`,
-            momentumSignal: isWin ? 'Full Take Profit Realized' : 'Max Drawdown Prevented',
+            momentumSignal: isWin ? 'Full ROE Realized' : 'Max Drawdown Prevented',
           },
           agentCycle: 'JOURNAL',
           outcomeNote: isWin
-            ? `✅ Win: Hit TP (+${Math.abs(pnlPips)} pts)`
-            : `🛑 Controlled Loss: Hit SL (-${Math.abs(pnlPips)} pts)`,
+            ? `✅ Win: Hit TP (+${Math.abs(roePercent).toFixed(1)}% ROE · +$${Math.abs(gainUsdt).toFixed(2)} USDT)`
+            : `🛑 Risk Managed: Hit SL (-${Math.abs(roePercent).toFixed(1)}% ROE · -$${Math.abs(gainUsdt).toFixed(2)} USDT)`,
         };
         setHistoricalJournals((prev) => {
           const updatedJournals = [completedJournal, ...prev.slice(0, 9)];
@@ -393,9 +399,9 @@ export default function App() {
         saveJournalEntryToCloud(completedJournal);
 
         if (isWin) {
-          showToast(`🎯 ${asset} HIT TP! (+${Math.abs(pnlPips)} pts). New signal active!`);
+          showToast(`🎯 ${asset} HIT TP! (+${Math.abs(roePercent).toFixed(1)}% ROE · +$${Math.abs(gainUsdt).toFixed(2)} USDT)`);
         } else {
-          showToast(`🛑 ${asset} HIT SL! (-${Math.abs(pnlPips)} pts). New signal active!`);
+          showToast(`🛑 ${asset} HIT SL! (-${Math.abs(roePercent).toFixed(1)}% ROE · -$${Math.abs(gainUsdt).toFixed(2)} USDT)`);
         }
 
         if (!isBotRunning) {
@@ -430,41 +436,47 @@ export default function App() {
     return () => clearInterval(interval);
   }, [fetchBtcData, fetchEthData, fetchXrpData]);
 
-  // Micro-fluctuation jitter simulation
+  // Micro-fluctuation jitter simulation across ALL 3 crypto assets (BTC, ETH, XRP)
   useEffect(() => {
     const microTickInterval = setInterval(() => {
-      const ticker =
-        selectedAsset === 'BTC/USDT'
-          ? btcTickerRef.current
-          : selectedAsset === 'ETH/USDT'
-          ? ethTickerRef.current
-          : xrpTickerRef.current;
-      if (!ticker || !ticker.price) return;
+      const assets: AssetSymbol[] = ['BTC/USDT', 'ETH/USDT', 'XRP/USDT'];
 
-      const delta =
-        selectedAsset === 'BTC/USDT'
-          ? (Math.random() - 0.49) * 2.2
-          : selectedAsset === 'ETH/USDT'
-          ? (Math.random() - 0.49) * 0.25
-          : (Math.random() - 0.49) * 0.0004;
+      assets.forEach((asset) => {
+        const ticker =
+          asset === 'BTC/USDT'
+            ? btcTickerRef.current
+            : asset === 'ETH/USDT'
+            ? ethTickerRef.current
+            : xrpTickerRef.current;
+        if (!ticker || !ticker.price) return;
 
-      const decimals = selectedAsset === 'XRP/USDT' ? 4 : 2;
-      const updatedPrice = parseFloat((ticker.price + delta).toFixed(decimals));
+        const delta =
+          asset === 'BTC/USDT'
+            ? (Math.random() - 0.49) * 2.4
+            : asset === 'ETH/USDT'
+            ? (Math.random() - 0.49) * 0.28
+            : (Math.random() - 0.49) * 0.0004;
 
-      if (updatedPrice > ticker.price) {
-        setPriceTickDirection('up');
-      } else if (updatedPrice < ticker.price) {
-        setPriceTickDirection('down');
-      }
-      setTimeout(() => setPriceTickDirection('neutral'), 400);
+        const decimals = asset === 'XRP/USDT' ? 4 : 2;
+        const updatedPrice = parseFloat((ticker.price + delta).toFixed(decimals));
 
-      ticker.price = updatedPrice;
-      if (selectedAsset === 'BTC/USDT') setBtcTicker({ ...ticker });
-      else if (selectedAsset === 'ETH/USDT') setEthTicker({ ...ticker });
-      else setXrpTicker({ ...ticker });
+        if (asset === selectedAsset) {
+          if (updatedPrice > ticker.price) {
+            setPriceTickDirection('up');
+          } else if (updatedPrice < ticker.price) {
+            setPriceTickDirection('down');
+          }
+          setTimeout(() => setPriceTickDirection('neutral'), 400);
+          prevPriceRef.current = updatedPrice;
+        }
 
-      prevPriceRef.current = updatedPrice;
-      handleIncomingPrice(selectedAsset, updatedPrice);
+        ticker.price = updatedPrice;
+        if (asset === 'BTC/USDT') setBtcTicker({ ...ticker });
+        else if (asset === 'ETH/USDT') setEthTicker({ ...ticker });
+        else setXrpTicker({ ...ticker });
+
+        handleIncomingPrice(asset, updatedPrice);
+      });
     }, 1000);
 
     return () => clearInterval(microTickInterval);
@@ -690,15 +702,18 @@ export default function App() {
               </>
             )}
 
-            {/* Live Portfolio */}
+            {/* Live Portfolio Combining 3 Crypto Assets (BTC, ETH, XRP) */}
             <OwnerLivePortfolio
-              currentSignal={activeSignal}
-              currentPrice={currentPrice}
-              selectedAsset={selectedAsset}
+              activeSignals={activeSignals}
+              currentPrices={{
+                'BTC/USDT': btcTicker.price,
+                'ETH/USDT': ethTicker.price,
+                'XRP/USDT': xrpTicker.price,
+              }}
               closedTrades={closedTrades}
-              priceTickDirection={priceTickDirection}
               userRole={userRole}
-              onOpenAccessModal={() => setIsVipPaymentOpen(true)}
+              onOpenAccessModal={() => setIsAccessModalOpen(true)}
+              onOpenVipPayment={() => setIsVipPaymentOpen(true)}
             />
           </div>
         )}
@@ -724,6 +739,7 @@ export default function App() {
               selectedAsset={selectedAsset}
               onSelectAsset={(asset) => setSelectedAsset(asset)}
               currentTicker={currentTicker}
+              activeSignal={activeSignals[selectedAsset]}
               userRole={userRole}
               onOpenVipModal={() => setIsVipPaymentOpen(true)}
             />
@@ -758,7 +774,7 @@ export default function App() {
         onOpenVipPayment={() => setIsVipPaymentOpen(true)}
       />
 
-      {/* VIP Payment Modal (QRIS & USDT) */}
+      {/* VIP Payment Modal (USDT TRC20 & BEP20) */}
       <VipPaymentModal
         isOpen={isVipPaymentOpen}
         onClose={() => setIsVipPaymentOpen(false)}

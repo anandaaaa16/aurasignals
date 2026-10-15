@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { ClosedTrade, calculateTradeGain } from '../types';
-import { Calendar, TrendingUp, TrendingDown, CheckCircle2, XCircle } from 'lucide-react';
+import { Calendar, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface DailyPnlViewProps {
   trades: ClosedTrade[];
@@ -13,7 +13,6 @@ interface DailyRecord {
   wins: number;
   losses: number;
   winRate: number;
-  totalPips: number;
   netDollar: number;
   netPercent: number;
   isProfit: boolean;
@@ -39,10 +38,9 @@ export const DailyPnlView: React.FC<DailyPnlViewProps> = ({ trades }) => {
       const losses = items.filter((t) => t.hitType === 'HIT_SL').length;
       const winRate = totalTrades > 0 ? Math.round((wins / totalTrades) * 100) : 0;
 
-      const totalPips = items.reduce((acc, t) => acc + t.pnlPips, 0);
-
       const netDollar = items.reduce((acc, t) => acc + calculateTradeGain(t), 0);
 
+      // Return on $500 portfolio
       const netPercent = Math.round((netDollar / 500) * 100 * 10) / 10;
 
       const d = new Date(dateStr);
@@ -62,7 +60,6 @@ export const DailyPnlView: React.FC<DailyPnlViewProps> = ({ trades }) => {
         wins,
         losses,
         winRate,
-        totalPips,
         netDollar: Math.round(netDollar * 100) / 100,
         netPercent,
         isProfit: netDollar >= 0,
@@ -82,6 +79,8 @@ export const DailyPnlView: React.FC<DailyPnlViewProps> = ({ trades }) => {
     return [...dailyRecords].sort((a, b) => b.netDollar - a.netDollar)[0];
   }, [dailyRecords]);
 
+  const avgDailyDollar = dailyRecords.length > 0 ? Math.round((totalNetDollar / dailyRecords.length) * 100) / 100 : 0;
+
   return (
     <div className="space-y-4 animate-in fade-in pb-12">
       {/* 1. Daily PnL Hero Overview Card */}
@@ -95,7 +94,7 @@ export const DailyPnlView: React.FC<DailyPnlViewProps> = ({ trades }) => {
             </div>
             <div>
               <h2 className="font-extrabold text-sm sm:text-base text-white tracking-wide">
-                Daily PnL
+                Daily PnL (Futures 10x Multiplier)
               </h2>
             </div>
           </div>
@@ -110,28 +109,31 @@ export const DailyPnlView: React.FC<DailyPnlViewProps> = ({ trades }) => {
           <div className="p-3 rounded-2xl bg-slate-900/60 border border-teal-500/20 col-span-1">
             <span className="text-[10px] text-slate-400 block mb-0.5">Total Realized PnL</span>
             <div className={`text-xl sm:text-2xl font-black tabular-nums ${totalNetDollar >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {totalNetDollar >= 0 ? '+' : ''}${totalNetDollar.toFixed(2)}
+              {totalNetDollar >= 0 ? '+' : '-'}${Math.abs(totalNetDollar).toFixed(2)}
             </div>
-            <span className="text-[10px] text-teal-300 font-bold block mt-0.5">
-              +{totalNetPercent}% Return
+            <span className={`text-[10px] font-bold block mt-0.5 ${totalNetPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {totalNetPercent >= 0 ? '+' : ''}{totalNetPercent}% Return
             </span>
           </div>
 
           <div className="p-3 rounded-2xl bg-slate-900/60 border border-teal-500/20 col-span-1">
             <span className="text-[10px] text-slate-400 block mb-0.5">Best Day</span>
             <div className="text-xl sm:text-2xl font-black text-amber-300 tabular-nums">
-              +${bestDay?.netDollar.toFixed(2) || '0.00'}
+              {bestDay && bestDay.netDollar >= 0 ? '+' : '-'}${bestDay ? Math.abs(bestDay.netDollar).toFixed(2) : '0.00'}
             </div>
-            <span className="text-[10px] text-slate-400 block mt-0.5">
-              {bestDay?.formattedDate || '---'} (+{bestDay?.netPercent || 0}%)
+            <span className="text-[10px] text-slate-400 block mt-0.5 truncate">
+              {bestDay?.formattedDate || '---'} ({bestDay && bestDay.netPercent >= 0 ? '+' : ''}{bestDay?.netPercent || 0}%)
             </span>
           </div>
 
           <div className="p-3 rounded-2xl bg-slate-900/60 border border-teal-500/20 col-span-2 sm:col-span-1">
             <span className="text-[10px] text-slate-400 block mb-0.5">Avg Daily PnL</span>
-            <div className="text-lg sm:text-xl font-black text-white tabular-nums">
-              +${dailyRecords.length > 0 ? (totalNetDollar / dailyRecords.length).toFixed(2) : '0.00'}
+            <div className={`text-lg sm:text-xl font-black tabular-nums ${avgDailyDollar >= 0 ? 'text-white' : 'text-rose-400'}`}>
+              {avgDailyDollar >= 0 ? '+' : '-'}${Math.abs(avgDailyDollar).toFixed(2)}
             </div>
+            <span className="text-[10px] text-teal-300 block mt-0.5 font-semibold">
+              Crypto Perpetual Futures
+            </span>
           </div>
         </div>
       </div>
@@ -206,15 +208,15 @@ export const DailyPnlView: React.FC<DailyPnlViewProps> = ({ trades }) => {
                       record.isProfit ? 'text-emerald-400' : 'text-rose-400'
                     }`}
                   >
-                    {record.isProfit ? '+' : ''}${record.netDollar.toFixed(2)}
+                    {record.isProfit ? '+' : '-'}${Math.abs(record.netDollar).toFixed(2)}
                   </div>
-                  <div className="text-[11px] text-slate-400">
+                  <div className={`text-[11px] ${record.isProfit ? 'text-slate-400' : 'text-rose-400/90'}`}>
                     {record.isProfit ? '+' : ''}{record.netPercent}% Return
                   </div>
                 </div>
 
-                <div className="text-right text-[11px] font-semibold text-teal-300/80 bg-teal-500/10 px-2 py-1 rounded-lg border border-teal-500/20">
-                  +{record.totalPips} pips
+                <div className="text-right text-[11px] font-semibold text-teal-300/90 bg-teal-500/10 px-2 py-1 rounded-lg border border-teal-500/20">
+                  10x Futures
                 </div>
               </div>
             </div>
