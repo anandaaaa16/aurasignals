@@ -94,7 +94,7 @@ export function subscribeToClosedTrades(
         }
       },
       (error) => {
-        handleFirestoreError(error, OperationType.GET, TRADES_COLLECTION);
+        handleFirestoreError(error, OperationType.LIST, TRADES_COLLECTION);
         // Fallback to local storage or generated historical trades
         try {
           const raw = localStorage.getItem('aurasignals_closed_trades');
@@ -110,7 +110,7 @@ export function subscribeToClosedTrades(
     );
     return unsubscribe;
   } catch (err) {
-    handleFirestoreError(err, OperationType.GET, TRADES_COLLECTION);
+    handleFirestoreError(err, OperationType.LIST, TRADES_COLLECTION);
     return () => {};
   }
 }
@@ -285,7 +285,7 @@ export function subscribeToVipPaymentRequests(
         onUpdate(reqs);
       },
       (error) => {
-        handleFirestoreError(error, OperationType.GET, VIP_REQUESTS_COLLECTION);
+        handleFirestoreError(error, OperationType.LIST, VIP_REQUESTS_COLLECTION);
       }
     );
   } catch (err) {

@@ -36,17 +36,17 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // 1. Closed Trades: Public read for transparency, validated write
+    // 1. Closed Trades: Public read (get & list) for real-time transparency
     match /closedTrades/{tradeId} {
-      allow read: if isValidId(tradeId);
+      allow get, list: if true;
       allow create: if isValidId(tradeId) && isValidTrade(incoming());
       allow update: if isValidId(tradeId) && isValidTrade(incoming());
       allow delete: if isValidId(tradeId);
     }
 
-    // 2. AI Trade Journals: Public read for research & audit trail
+    // 2. AI Trade Journals: Public read (get & list) for research & audit trail
     match /aiJournals/{journalId} {
-      allow read: if isValidId(journalId);
+      allow get, list: if true;
       allow create: if isValidId(journalId) && isValidJournal(incoming());
       allow update: if isValidId(journalId) && isValidJournal(incoming());
       allow delete: if isValidId(journalId);
@@ -54,19 +54,19 @@ service cloud.firestore {
 
     // 3. Access Role & 6-Digit PIN Configurations
     match /accessConfig/{configId} {
-      allow read: if isValidId(configId);
+      allow get, list: if true;
       allow write: if isValidId(configId);
     }
 
     // 4. System State: Live active positions persistence & bot control
     match /systemState/{stateId} {
-      allow read: if isValidId(stateId);
+      allow get, list: if true;
       allow write: if isValidId(stateId);
     }
 
     // 5. VIP Requests
     match /vipRequests/{requestId} {
-      allow read: if isValidId(requestId);
+      allow get, list: if true;
       allow write: if isValidId(requestId);
     }
   }
