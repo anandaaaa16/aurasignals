@@ -6,13 +6,17 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
-        "asset": { "type": "string", "enum": ["BTC/USDT", "XAU/USD"] },
+        "asset": { "type": "string", "enum": ["BTC/USDT", "ETH/USDT", "XRP/USDT"] },
         "direction": { "type": "string", "enum": ["BUY", "SELL"] },
         "entryPrice": { "type": "number" },
         "exitPrice": { "type": "number" },
         "hitType": { "type": "string", "enum": ["HIT_TP", "HIT_SL"] },
         "pnlPercent": { "type": "number" },
         "pnlPips": { "type": "number" },
+        "leverage": { "type": "number" },
+        "marginUsdt": { "type": "number" },
+        "gainUsdt": { "type": "number" },
+        "roePercent": { "type": "number" },
         "dateStr": { "type": "string", "maxLength": 32 },
         "timeStr": { "type": "string", "maxLength": 32 },
         "timestamp": { "type": "number" }
@@ -25,7 +29,7 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
-        "asset": { "type": "string", "enum": ["BTC/USDT", "XAU/USD"] },
+        "asset": { "type": "string", "enum": ["BTC/USDT", "ETH/USDT", "XRP/USDT"] },
         "action": { "type": "string", "enum": ["BUY", "SELL", "HOLD"] },
         "confidence": { "type": "number" },
         "setupRationale": { "type": "string", "maxLength": 1000 },
@@ -45,6 +49,29 @@
         "updatedAt": { "type": "number" }
       },
       "required": ["adminPin"]
+    },
+    "SystemState": {
+      "title": "SystemState",
+      "description": "Real-time active signals and live trading state persistence",
+      "type": "object",
+      "properties": {
+        "activeSignals": { "type": "object" },
+        "botRunning": { "type": "boolean" },
+        "updatedAt": { "type": "number" }
+      }
+    },
+    "VipRequest": {
+      "title": "VipRequest",
+      "description": "VIP subscription payment confirmation request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "txHash": { "type": "string" },
+        "network": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "number" }
+      }
     }
   },
   "firestore": {
@@ -59,6 +86,14 @@
     "/accessConfig/{configId}": {
       "schema": { "$ref": "#/entities/AccessRole" },
       "description": "6-digit access codes for Admin and VIP members"
+    },
+    "/systemState/{stateId}": {
+      "schema": { "$ref": "#/entities/SystemState" },
+      "description": "Persisted live active positions and global bot runtime state"
+    },
+    "/vipRequests/{requestId}": {
+      "schema": { "$ref": "#/entities/VipRequest" },
+      "description": "USDT payment verification requests"
     }
   }
 }

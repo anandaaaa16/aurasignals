@@ -44,6 +44,7 @@ export interface SignalData {
   asset: AssetSymbol;
   timeframe: string;
   createdAt: number;
+  timestamp?: number;
   signal: SignalType;
   confidencePercent: number;
   timeHorizon: string;

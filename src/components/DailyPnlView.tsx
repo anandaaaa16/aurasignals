@@ -43,15 +43,20 @@ export const DailyPnlView: React.FC<DailyPnlViewProps> = ({ trades }) => {
       // Return on $500 portfolio
       const netPercent = Math.round((netDollar / 500) * 100 * 10) / 10;
 
-      const d = new Date(dateStr);
-      const formattedDate = !isNaN(d.getTime())
-        ? d.toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-          })
-        : dateStr;
+      const parts = dateStr.split('-');
+      let formattedDate = dateStr;
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const localD = new Date(year, month, day);
+        formattedDate = localD.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        });
+      }
 
       return {
         dateStr,

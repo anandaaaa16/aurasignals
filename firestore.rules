@@ -1,7 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
     // Helper functions
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
@@ -11,14 +10,10 @@ service cloud.firestore {
       return request.resource.data;
     }
 
-    function existing() {
-      return resource.data;
-    }
-
     function isValidTrade(data) {
       return data.keys().hasAll(['id', 'asset', 'direction', 'entryPrice', 'exitPrice', 'hitType', 'pnlPercent', 'timestamp'])
         && data.id is string && data.id.size() <= 128
-        && data.asset in ['BTC/USDT', 'XAU/USD']
+        && data.asset in ['BTC/USDT', 'ETH/USDT', 'XRP/USDT', 'XAU/USD']
         && data.direction in ['BUY', 'SELL']
         && data.hitType in ['HIT_TP', 'HIT_SL']
         && data.entryPrice is number
@@ -30,9 +25,9 @@ service cloud.firestore {
     function isValidJournal(data) {
       return data.keys().hasAll(['id', 'asset', 'action', 'setupRationale', 'timestamp'])
         && data.id is string && data.id.size() <= 128
-        && data.asset in ['BTC/USDT', 'XAU/USD']
+        && data.asset in ['BTC/USDT', 'ETH/USDT', 'XRP/USDT', 'XAU/USD']
         && data.action in ['BUY', 'SELL', 'HOLD']
-        && data.setupRationale is string && data.setupRationale.size() <= 1000
+        && data.setupRationale is string && data.setupRationale.size() <= 2000
         && data.timestamp is number;
     }
 
@@ -60,7 +55,19 @@ service cloud.firestore {
     // 3. Access Role & 6-Digit PIN Configurations
     match /accessConfig/{configId} {
       allow read: if isValidId(configId);
-      allow write: if isValidId(configId) && incoming().adminPin is string && incoming().adminPin.size() <= 6;
+      allow write: if isValidId(configId);
+    }
+
+    // 4. System State: Live active positions persistence & bot control
+    match /systemState/{stateId} {
+      allow read: if isValidId(stateId);
+      allow write: if isValidId(stateId);
+    }
+
+    // 5. VIP Requests
+    match /vipRequests/{requestId} {
+      allow read: if isValidId(requestId);
+      allow write: if isValidId(requestId);
     }
   }
 }
