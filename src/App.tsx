@@ -19,11 +19,13 @@ import { GuestSignalLock } from './components/GuestSignalLock';
 import { VipPaymentModal } from './components/VipPaymentModal';
 import { AnalyticChartsView } from './components/AnalyticChartsView';
 import { ManualTradeModal } from './components/ManualTradeModal';
+import { BotControlBanner } from './components/BotControlBanner';
 import {
   subscribeToClosedTrades,
   saveClosedTradeToCloud,
   saveJournalEntryToCloud,
   subscribeToBotControl,
+  setBotControlInCloud,
   subscribeToActiveSignals,
   saveActiveSignalsToCloud,
   clearAllTradesInCloud,
@@ -633,6 +635,40 @@ export default function App() {
     );
   };
 
+  // Bot AI Master Toggle (Manual Start / Pause by User)
+  const handleToggleBot = async (running: boolean) => {
+    setIsBotRunning(running);
+    await setBotControlInCloud(running);
+    if (running) {
+      showToast('🤖 Bot AI Trading DIAKTIFKAN! Memulai pemindaian pasar BTC, ETH & XRP...');
+      const currentSigObj = { ...activeSignalsRef.current };
+      let hasChanges = false;
+      const assets: AssetSymbol[] = ['BTC/USDT', 'ETH/USDT', 'XRP/USDT'];
+      assets.forEach((asset) => {
+        const existingSig = currentSigObj[asset];
+        if (!existingSig || existingSig.status !== 'RUNNING') {
+          const ticker =
+            asset === 'BTC/USDT' ? btcTickerRef.current : asset === 'ETH/USDT' ? ethTickerRef.current : xrpTickerRef.current;
+          const fallbackPrice = asset === 'BTC/USDT' ? 83650 : asset === 'ETH/USDT' ? 2542 : 1.382;
+          const basePrice = ticker?.price || fallbackPrice;
+          const candles = ticker?.candles || [];
+          const sig = generateInstantSignal(asset, '1h', basePrice, candles, {
+            high24h: ticker?.high24h,
+            low24h: ticker?.low24h,
+            changePercent: ticker?.changePercent,
+          });
+          currentSigObj[asset] = sig;
+          hasChanges = true;
+        }
+      });
+      if (hasChanges) {
+        updateAndPersistSignals(currentSigObj);
+      }
+    } else {
+      showToast('⏸️ Bot AI Trading DIJEDA (Mode Standby).');
+    }
+  };
+
   // Admin Control Actions
   const handleForceCloseSignal = (asset: AssetSymbol, hitType: 'HIT_TP' | 'HIT_SL') => {
     const sig = activeSignalsRef.current[asset];
@@ -783,6 +819,13 @@ export default function App() {
         {/* TAB 1: Sinyal Live */}
         {activeSection === 'chart' && (
           <div className="space-y-3">
+            {/* Master Bot AI Start/Pause Switch - User controls when to start trading */}
+            <BotControlBanner
+              isBotRunning={isBotRunning}
+              onToggleBot={handleToggleBot}
+              activeCount={Object.values(activeSignals).filter((s) => s && s.status === 'RUNNING').length}
+            />
+
             {/* Asset Header with switcher for BTC, ETH, XRP */}
             <AssetHero
               selectedAsset={selectedAsset}
@@ -922,14 +965,7 @@ export default function App() {
         isOpen={isAdminModalOpen}
         onClose={() => setIsAdminModalOpen(false)}
         isBotRunning={isBotRunning}
-        onToggleBot={(running) => {
-          setIsBotRunning(running);
-          showToast(
-            running
-              ? '▶️ AI Trading Bot Started.'
-              : '⏸️ AI Trading Bot Paused (Manual Trading Mode).'
-          );
-        }}
+        onToggleBot={handleToggleBot}
         activeSignals={activeSignals}
         onForceCloseSignal={handleForceCloseSignal}
         onAddManualSignal={handleAddManualSignal}
