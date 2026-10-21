@@ -37,10 +37,28 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
     );
   }
 
-  if (!signal || !currentPrice) {
+  if (!signal) {
+    return (
+      <div className="glass-panel rounded-3xl p-5 border border-teal-500/20 text-center space-y-2 backdrop-blur-2xl">
+        <div className="w-10 h-10 rounded-2xl bg-teal-500/15 border border-teal-500/30 text-teal-400 mx-auto flex items-center justify-center">
+          <Compass className="w-5 h-5 animate-pulse" />
+        </div>
+        <div className="space-y-1">
+          <h3 className="font-extrabold text-sm text-white font-mono tracking-wide">
+            STANDBY · SIAP TRADING MANUAL
+          </h3>
+          <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
+            Tidak ada posisi terbuka. Gunakan tombol <strong>+ Trade Manual</strong> untuk membuka posisi sesuai analisa Anda.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentPrice) {
     return (
       <div className="p-5 glass-panel rounded-3xl text-center text-slate-400">
-        <p className="text-xs">Loading active signals...</p>
+        <p className="text-xs font-mono">Menghubungkan ke pasar Binance...</p>
       </div>
     );
   }

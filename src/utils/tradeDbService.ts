@@ -53,58 +53,23 @@ export function subscribeToClosedTrades(
           remoteTrades.push(d.data() as ClosedTrade);
         });
 
-        if (remoteTrades.length === 0) {
-          // If Firestore is currently empty, initialize with realistic multi-day historical trades
-          let localTrades: ClosedTrade[] = [];
-          try {
-            const raw = localStorage.getItem('aurasignals_closed_trades');
-            if (raw) localTrades = JSON.parse(raw);
-          } catch (e) {}
-
-          if (localTrades.length === 0) {
-            const seeded = generateRealisticHistoricalTrades();
-            try {
-              localStorage.setItem('aurasignals_closed_trades', JSON.stringify(seeded));
-            } catch (e) {}
-            onUpdate(seeded);
-            // Sync initial trades to Firestore in the background
-            seeded.slice(0, 15).forEach((t) => saveClosedTradeToCloud(t));
-          } else {
-            onUpdate(localTrades);
-          }
-        } else {
-          // If remote trades exist, ensure historical days are preserved for a complete multi-day view
-          let allTrades = remoteTrades;
-          if (remoteTrades.length < 15) {
-            const historical = generateRealisticHistoricalTrades();
-            const existingIds = new Set(remoteTrades.map((t) => t.id));
-            const merged = [...remoteTrades];
-            for (const h of historical) {
-              if (!existingIds.has(h.id)) {
-                merged.push(h);
-              }
-            }
-            merged.sort((a, b) => b.timestamp - a.timestamp);
-            allTrades = merged;
-          }
-          try {
-            localStorage.setItem('aurasignals_closed_trades', JSON.stringify(allTrades));
-          } catch (e) {}
-          onUpdate(allTrades);
-        }
+        try {
+          localStorage.setItem('aurasignals_closed_trades', JSON.stringify(remoteTrades));
+        } catch (e) {}
+        onUpdate(remoteTrades);
       },
       (error) => {
         handleFirestoreError(error, OperationType.LIST, TRADES_COLLECTION);
-        // Fallback to local storage or generated historical trades
         try {
           const raw = localStorage.getItem('aurasignals_closed_trades');
           if (raw) {
             onUpdate(JSON.parse(raw));
           } else {
-            const seeded = generateRealisticHistoricalTrades();
-            onUpdate(seeded);
+            onUpdate([]);
           }
-        } catch (e) {}
+        } catch (e) {
+          onUpdate([]);
+        }
         if (onError) onError(error);
       }
     );
@@ -126,9 +91,28 @@ export async function clearAllTradesInCloud(): Promise<boolean> {
     for (const d of journalDocs.docs) {
       await deleteDoc(d.ref);
     }
+    // Also reset active open positions in cloud
+    await setDoc(doc(db, SYSTEM_COLLECTION, 'activeSignals'), {
+      signals: {
+        'BTC/USDT': null,
+        'ETH/USDT': null,
+        'XRP/USDT': null,
+      },
+      updatedAt: Date.now(),
+    });
+    // Set bot running state to paused (manual trading mode)
+    await setDoc(
+      doc(db, CONFIG_COLLECTION, 'system'),
+      {
+        botRunning: false,
+        updatedAt: Date.now(),
+      },
+      { merge: true }
+    );
     try {
       localStorage.removeItem('aurasignals_closed_trades');
       localStorage.removeItem('aurasignals_ai_journals');
+      localStorage.removeItem('aurasignals_active_signals');
     } catch (e) {}
     return true;
   } catch (e) {

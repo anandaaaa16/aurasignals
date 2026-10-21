@@ -18,6 +18,7 @@ import { AdminControlModal } from './components/AdminControlModal';
 import { GuestSignalLock } from './components/GuestSignalLock';
 import { VipPaymentModal } from './components/VipPaymentModal';
 import { AnalyticChartsView } from './components/AnalyticChartsView';
+import { ManualTradeModal } from './components/ManualTradeModal';
 import {
   subscribeToClosedTrades,
   saveClosedTradeToCloud,
@@ -30,7 +31,7 @@ import {
 import { generateInstantSignal, checkSignalHit, generateWavePoints } from './utils/signalEngine';
 import { generateLiveJournalEntry } from './utils/aiTradingAgent';
 import { playAlertSound } from './utils/sound';
-import { Bell, BellOff, Crown, UserCheck, KeyRound, Sliders, Sparkles } from 'lucide-react';
+import { Bell, BellOff, Crown, UserCheck, KeyRound, Sliders, Sparkles, Zap } from 'lucide-react';
 
 const DEFAULT_BTC: MarketTicker = {
   symbol: 'BTC/USDT',
@@ -97,10 +98,16 @@ export default function App() {
   const prevPriceRef = useRef<number>(83674.0);
   const [priceTickDirection, setPriceTickDirection] = useState<'up' | 'down' | 'neutral'>('neutral');
 
-  // TRADE HISTORY STATE
-  const [closedTrades, setClosedTrades] = useState<ClosedTrade[]>([]);
+  // TRADE HISTORY STATE - Clean start (0 trades)
+  const [closedTrades, setClosedTrades] = useState<ClosedTrade[]>(() => {
+    try {
+      const raw = localStorage.getItem('aurasignals_closed_trades');
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return [];
+  });
 
-  // ACTIVE SIGNALS: Maintained with Persistent Storage (Never resets to 0 on reload!)
+  // ACTIVE SIGNALS: Maintained with Persistent Storage (Clean start - 0 open positions)
   const [activeSignals, setActiveSignals] = useState<Record<AssetSymbol, SignalData | null>>(() => {
     try {
       const raw = localStorage.getItem('aurasignals_active_signals');
@@ -131,16 +138,17 @@ export default function App() {
     return [];
   });
 
-  // BOT AI TRADING CONTROL
-  const [isBotRunning, setIsBotRunning] = useState<boolean>(true);
+  // BOT AI TRADING CONTROL - Default Paused / False so User Can Do Manual Trading
+  const [isBotRunning, setIsBotRunning] = useState<boolean>(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
   const [isVipPaymentOpen, setIsVipPaymentOpen] = useState<boolean>(false);
+  const [isManualTradeModalOpen, setIsManualTradeModalOpen] = useState<boolean>(false);
 
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   // 6-DIGIT ACCESS ROLE: Guest vs Member vs Admin
@@ -175,14 +183,11 @@ export default function App() {
 
     const unsubscribeSignals = subscribeToActiveSignals((cloudSignals) => {
       if (cloudSignals && typeof cloudSignals === 'object') {
-        const hasValid = Object.values(cloudSignals).some((s) => s && s.status === 'RUNNING');
-        if (hasValid) {
-          activeSignalsRef.current = cloudSignals;
-          setActiveSignals(cloudSignals);
-          try {
-            localStorage.setItem('aurasignals_active_signals', JSON.stringify(cloudSignals));
-          } catch (e) {}
-        }
+        activeSignalsRef.current = cloudSignals;
+        setActiveSignals(cloudSignals);
+        try {
+          localStorage.setItem('aurasignals_active_signals', JSON.stringify(cloudSignals));
+        } catch (e) {}
       }
     });
 
@@ -364,7 +369,7 @@ export default function App() {
         const dir = isBuy ? 1 : -1;
         const priceMovePct = avgEntry > 0 ? ((exitPrice - avgEntry) / avgEntry) * dir : 0;
         const leverage = 10;
-        const marginUsdt = 150.0;
+        const marginUsdt = sig.recommendedMarginUsdt || 150.0;
         const roePercent = Math.round(priceMovePct * leverage * 100 * 10) / 10;
         const gainUsdt = Math.round(marginUsdt * (roePercent / 100) * 100) / 100;
         const pnlPips = Math.round(Math.abs(exitPrice - avgEntry));
@@ -453,14 +458,14 @@ export default function App() {
           showToast(`🛑 ${asset} HIT SL! (-${Math.abs(roePercent).toFixed(1)}% ROE · -$${Math.abs(gainUsdt).toFixed(2)} USDT)`);
         }
 
+        // If automated bot is not running, position finishes and remains closed (Manual mode!)
         if (!isBotRunning) {
-          const pausedSignals = { ...activeSignalsRef.current, [asset]: null };
-          updateAndPersistSignals(pausedSignals);
-          showToast(`AI Trading Bot paused by Admin.`);
+          const finishedSignals = { ...activeSignalsRef.current, [asset]: null };
+          updateAndPersistSignals(finishedSignals);
           return;
         }
 
-        // Instantly generate the next high-conviction 10x signal & persist it
+        // If bot is active, generate next signal
         const ticker =
           asset === 'BTC/USDT' ? btcTickerRef.current : asset === 'ETH/USDT' ? ethTickerRef.current : xrpTickerRef.current;
         const candles = ticker?.candles || [];
@@ -534,7 +539,7 @@ export default function App() {
     selectedAsset === 'BTC/USDT' ? btcTicker : selectedAsset === 'ETH/USDT' ? ethTicker : xrpTicker;
   const currentPrice = currentTicker?.price || (selectedAsset === 'BTC/USDT' ? 83040 : selectedAsset === 'ETH/USDT' ? 2540 : 1.38);
 
-  // Initialize or Catch-Up Signals (Guarantees Entry & Floating Profits are preserved on Reload!)
+  // Bot-only Signal Generation Effect (DISABLED when isBotRunning is false!)
   useEffect(() => {
     if (!isBotRunning) return;
     const currentSigObj = { ...activeSignalsRef.current };
@@ -548,69 +553,10 @@ export default function App() {
       const basePrice = ticker?.price || fallbackPrice;
       const candles = ticker?.candles || [];
 
-      // If no signal exists yet, create one
       if (!existingSig || existingSig.status !== 'RUNNING') {
         const sig = generateInstantSignal(asset, '1h', basePrice, candles);
         currentSigObj[asset] = sig;
         hasChanges = true;
-      } else {
-        // If a signal ALREADY exists, check if it ran for more than 4 hours while user was offline
-        const signalCreatedTime = existingSig.createdAt || existingSig.timestamp || 0;
-        const elapsedMs = Date.now() - signalCreatedTime;
-        const elapsedHours = elapsedMs / (1000 * 60 * 60);
-
-        // If the signal was open during previous session / hours ago, evaluate completion & rotate
-        if (elapsedHours >= 4.0) {
-          const isWin = Math.random() > 0.15; // 85% algorithmic win rate
-          const isBuy = existingSig.signal.includes('BUY');
-          const avgEntry = existingSig.entryPrice || (existingSig.entryRange.min + existingSig.entryRange.max) / 2;
-          const exitPrice = isWin ? existingSig.takeProfit[0].price : existingSig.stopLoss.price;
-          const leverage = 10;
-          const marginUsdt = 150.0;
-          const dir = isBuy ? 1 : -1;
-          const priceMovePct = avgEntry > 0 ? ((exitPrice - avgEntry) / avgEntry) * dir : 0;
-          const roePercent = Math.round(priceMovePct * leverage * 100 * 10) / 10;
-          const gainUsdt = Math.round(marginUsdt * (roePercent / 100) * 100) / 100;
-          const pnlPips = Math.round(Math.abs(exitPrice - avgEntry));
-
-          const tradeDate = new Date(Date.now() - 30 * 60 * 1000);
-          const pad = (n: number) => String(n).padStart(2, '0');
-          const dateStr = `${tradeDate.getFullYear()}-${pad(tradeDate.getMonth() + 1)}-${pad(tradeDate.getDate())}`;
-          const timeStr = `${pad(tradeDate.getHours())}:${pad(tradeDate.getMinutes())} UTC`;
-
-          const closedTradeItem: ClosedTrade = {
-            id: `trade-catchup-${Date.now()}-${asset.replace('/', '')}`,
-            dateStr,
-            timeStr,
-            asset,
-            direction: isBuy ? 'BUY' : 'SELL',
-            entryPrice: avgEntry,
-            exitPrice,
-            hitType: isWin ? 'HIT_TP' : 'HIT_SL',
-            leverage,
-            marginUsdt,
-            gainUsdt,
-            roePercent,
-            pnlPercent: roePercent,
-            pnlPips,
-            waveTrajectory: generateWavePoints(avgEntry, exitPrice, isWin ? 'HIT_TP' : 'HIT_SL'),
-            timestamp: tradeDate.getTime(),
-          };
-
-          setClosedTrades((prev) => {
-            const updated = [closedTradeItem, ...prev];
-            try {
-              localStorage.setItem('aurasignals_closed_trades', JSON.stringify(updated));
-            } catch (e) {}
-            return updated;
-          });
-          saveClosedTradeToCloud(closedTradeItem);
-
-          // Generate a fresh live position for today
-          const freshSig = generateInstantSignal(asset, '1h', basePrice, candles);
-          currentSigObj[asset] = freshSig;
-          hasChanges = true;
-        }
       }
     });
 
@@ -618,6 +564,74 @@ export default function App() {
       updateAndPersistSignals(currentSigObj);
     }
   }, [isBotRunning, updateAndPersistSignals]);
+
+  // MANUAL TRADING ACTIONS
+  const handleOpenManualTrade = (signal: SignalData) => {
+    const updatedSignals = { ...activeSignalsRef.current, [signal.asset]: signal };
+    updateAndPersistSignals(updatedSignals);
+    setSelectedAsset(signal.asset);
+    showToast(`🚀 Posisi ${signal.asset} (${signal.signal}) berhasil dibuka secara manual!`);
+  };
+
+  const handleManualClosePosition = (asset: AssetSymbol) => {
+    const sig = activeSignalsRef.current[asset];
+    if (!sig) return;
+
+    const ticker =
+      asset === 'BTC/USDT' ? btcTickerRef.current : asset === 'ETH/USDT' ? ethTickerRef.current : xrpTickerRef.current;
+    const currentMarketPrice = ticker?.price || sig.entryPrice || 0;
+    const isBuy = sig.signal.includes('BUY');
+    const avgEntry = sig.entryPrice || (sig.entryRange.min + sig.entryRange.max) / 2;
+    const dir = isBuy ? 1 : -1;
+    const priceMovePct = avgEntry > 0 ? ((currentMarketPrice - avgEntry) / avgEntry) * dir : 0;
+    const leverage = 10;
+    const marginUsdt = sig.recommendedMarginUsdt || 150.0;
+    const roePercent = Math.round(priceMovePct * leverage * 100 * 10) / 10;
+    const gainUsdt = Math.round(marginUsdt * (roePercent / 100) * 100) / 100;
+    const pnlPips = Math.round(Math.abs(currentMarketPrice - avgEntry));
+    const isWin = gainUsdt >= 0;
+
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())} UTC`;
+
+    const closedTradeItem: ClosedTrade = {
+      id: `trade-manual-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      dateStr,
+      timeStr,
+      asset,
+      direction: isBuy ? 'BUY' : 'SELL',
+      entryPrice: avgEntry,
+      exitPrice: currentMarketPrice,
+      hitType: isWin ? 'HIT_TP' : 'HIT_SL',
+      leverage,
+      marginUsdt,
+      gainUsdt,
+      roePercent,
+      pnlPercent: roePercent,
+      pnlPips,
+      waveTrajectory: generateWavePoints(avgEntry, currentMarketPrice, isWin ? 'HIT_TP' : 'HIT_SL'),
+      timestamp: Date.now(),
+    };
+
+    setClosedTrades((prev) => {
+      const updated = [closedTradeItem, ...prev];
+      try {
+        localStorage.setItem('aurasignals_closed_trades', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+    saveClosedTradeToCloud(closedTradeItem);
+
+    // Remove from active signals
+    const updatedSignals = { ...activeSignalsRef.current, [asset]: null };
+    updateAndPersistSignals(updatedSignals);
+
+    showToast(
+      `${isWin ? '🎯' : '🛑'} Posisi ${asset} ditutup di harga $${currentMarketPrice.toLocaleString()} (${isWin ? '+' : ''}$${gainUsdt.toFixed(2)} USDT · ${roePercent}%)`
+    );
+  };
 
   // Admin Control Actions
   const handleForceCloseSignal = (asset: AssetSymbol, hitType: 'HIT_TP' | 'HIT_SL') => {
@@ -629,25 +643,31 @@ export default function App() {
   };
 
   const handleAddManualSignal = (newSignal: SignalData) => {
-    const updated = { ...activeSignalsRef.current, [newSignal.asset]: newSignal };
-    updateAndPersistSignals(updated);
-    showToast(`Manual signal ${newSignal.asset} (${newSignal.signal}) published.`);
+    handleOpenManualTrade(newSignal);
   };
 
   const handleResetAllHistory = () => {
     setClosedTrades([]);
     setHistoricalJournals([]);
+    const cleanSignals = {
+      'BTC/USDT': null,
+      'ETH/USDT': null,
+      'XRP/USDT': null,
+    };
+    updateAndPersistSignals(cleanSignals);
     try {
       localStorage.removeItem('aurasignals_closed_trades');
       localStorage.removeItem('aurasignals_ai_journals');
+      localStorage.removeItem('aurasignals_active_signals');
     } catch (e) {}
     clearAllTradesInCloud().catch(() => {});
-    showToast('All trade history cleared (Fresh Start 0 Trades).');
+    showToast('Semua sinyal, posisi, dan riwayat trading berhasil di-reset.');
   };
 
   const activeSignal = activeSignals[selectedAsset] || activeSignalsRef.current[selectedAsset];
 
   const currentJournal = useMemo(() => {
+    if (!activeSignal) return null;
     return generateLiveJournalEntry(activeSignal, currentPrice);
   }, [activeSignal, currentPrice]);
 
@@ -684,6 +704,16 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-1.5">
+            {/* Quick Manual Trade Button */}
+            <button
+              onClick={() => setIsManualTradeModalOpen(true)}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-xl text-[10px] font-mono font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40 hover:bg-teal-500/30 transition-all cursor-pointer shadow-sm shadow-teal-500/20 active:scale-95"
+              title="Buka Posisi Manual"
+            >
+              <Zap className="w-3 h-3 text-teal-400 fill-current" />
+              <span>+ TRADE</span>
+            </button>
+
             {/* VIP Upgrade Button */}
             {userRole === 'GUEST' && (
               <button
@@ -703,7 +733,7 @@ export default function App() {
                 title="Open Admin Control Panel"
               >
                 <Sliders className="w-3 h-3 text-amber-400" />
-                <span>ADMIN PANEL</span>
+                <span>ADMIN</span>
               </button>
             )}
 
@@ -749,21 +779,6 @@ export default function App() {
             </button>
           </div>
         </div>
-
-        {/* Bot Paused Banner */}
-        {!isBotRunning && (
-          <div className="p-2.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-mono font-bold flex items-center justify-between animate-pulse">
-            <span>⚠️ AI TRADING BOT PAUSED BY ADMIN</span>
-            {userRole === 'ADMIN' && (
-              <button
-                onClick={() => setIsAdminModalOpen(true)}
-                className="underline hover:text-white cursor-pointer text-[11px]"
-              >
-                Resume Bot
-              </button>
-            )}
-          </div>
-        )}
 
         {/* TAB 1: Sinyal Live */}
         {activeSection === 'chart' && (
@@ -824,6 +839,8 @@ export default function App() {
               userRole={userRole}
               onOpenAccessModal={() => setIsAccessModalOpen(true)}
               onOpenVipPayment={() => setIsVipPaymentOpen(true)}
+              onOpenManualTrade={() => setIsManualTradeModalOpen(true)}
+              onClosePosition={handleManualClosePosition}
             />
           </div>
         )}
@@ -861,6 +878,15 @@ export default function App() {
       <BottomNavBar
         activeSection={activeSection}
         onSelectSection={(sec) => setActiveSection(sec)}
+      />
+
+      {/* Manual Trade Modal */}
+      <ManualTradeModal
+        isOpen={isManualTradeModalOpen}
+        onClose={() => setIsManualTradeModalOpen(false)}
+        currentPrices={{ btc: btcTicker.price, eth: ethTicker.price, xrp: xrpTicker.price }}
+        activeSignals={activeSignals}
+        onOpenTrade={handleOpenManualTrade}
       />
 
       {/* 6-Digit PIN Modal */}
@@ -901,7 +927,7 @@ export default function App() {
           showToast(
             running
               ? '▶️ AI Trading Bot Started.'
-              : '⏸️ AI Trading Bot Paused by Admin.'
+              : '⏸️ AI Trading Bot Paused (Manual Trading Mode).'
           );
         }}
         activeSignals={activeSignals}

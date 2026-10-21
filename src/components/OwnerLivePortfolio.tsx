@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { AssetSymbol, ClosedTrade, SignalData, calculateTradeGain } from '../types';
-import { ArrowUpRight, ArrowDownRight, Lock, Sparkles, Layers, Zap } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Layers, Zap, Plus, X } from 'lucide-react';
 
 interface OwnerLivePortfolioProps {
   activeSignals: Record<AssetSymbol, SignalData | null>;
@@ -9,6 +9,8 @@ interface OwnerLivePortfolioProps {
   userRole?: 'GUEST' | 'MEMBER' | 'ADMIN';
   onOpenAccessModal?: () => void;
   onOpenVipPayment?: () => void;
+  onOpenManualTrade?: () => void;
+  onClosePosition?: (asset: AssetSymbol) => void;
 }
 
 export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
@@ -18,6 +20,8 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
   userRole = 'GUEST',
   onOpenAccessModal,
   onOpenVipPayment,
+  onOpenManualTrade,
+  onClosePosition,
 }) => {
   const INITIAL_CAPITAL = 500.0;
   const isGuest = userRole === 'GUEST';
@@ -45,19 +49,21 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
           signal.entryPrice ||
           (signal.entryRange.min + signal.entryRange.max) / 2;
 
+        const margin = signal.recommendedMarginUsdt || MARGIN_PER_ASSET;
+
         // Price percentage movement
         const priceMovePct = entryPrice > 0 ? ((price - entryPrice) / entryPrice) * (isBuy ? 1 : -1) : 0;
         // 10x Leverage Multiplier applied to ROE
         const roePercent = priceMovePct * LEVERAGE * 100;
-        // Floating Dollar Profit on $150 USDT Margin
-        const floatingDollar = MARGIN_PER_ASSET * (roePercent / 100);
+        // Floating Dollar Profit on Margin
+        const floatingDollar = margin * (roePercent / 100);
 
         return {
           asset,
           direction: isBuy ? ('BUY' as const) : ('SELL' as const),
           leverage: LEVERAGE,
-          marginUsdt: MARGIN_PER_ASSET,
-          positionNotional: MARGIN_PER_ASSET * LEVERAGE,
+          marginUsdt: margin,
+          positionNotional: margin * LEVERAGE,
           entryPrice,
           currentPrice: price,
           floatingDollar: Math.round(floatingDollar * 100) / 100,
@@ -82,7 +88,7 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
   const isPositiveFloating = totalCombinedFloating >= 0;
 
   const winCount = closedTrades.filter((t) => t.hitType === 'HIT_TP').length;
-  const winRate = closedTrades.length > 0 ? Math.round((winCount / closedTrades.length) * 1000) / 10 : 85.7;
+  const winRate = closedTrades.length > 0 ? Math.round((winCount / closedTrades.length) * 1000) / 10 : 0.0;
 
   const formatPrice = (val?: number, asset?: AssetSymbol) => {
     if (!val) return '---';
@@ -91,17 +97,9 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
     return val.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
   };
 
-  const handleUnlockClick = () => {
-    if (onOpenVipPayment) {
-      onOpenVipPayment();
-    } else if (onOpenAccessModal) {
-      onOpenAccessModal();
-    }
-  };
-
   return (
     <div className="glass-panel rounded-3xl p-4 sm:p-5 border border-teal-500/25 shadow-2xl space-y-3.5 backdrop-blur-2xl">
-      {/* Header: Live Trading & Initial Portfolio Balance */}
+      {/* Header: Live Trading, Initial Balance & Manual Trade Button */}
       <div className="flex items-center justify-between border-b border-teal-500/15 pb-2.5">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-md shadow-emerald-400" />
@@ -110,8 +108,21 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
           </h3>
         </div>
 
-        <div className="text-right font-mono text-xs text-slate-400 flex items-center gap-1.5">
-          <span>Balance: <strong className="text-white">${INITIAL_CAPITAL.toFixed(2)}</strong></span>
+        <div className="flex items-center gap-2.5 font-mono text-xs">
+          <span className="text-slate-400">
+            Balance: <strong className="text-white">${INITIAL_CAPITAL.toFixed(2)}</strong>
+          </span>
+
+          {onOpenManualTrade && (
+            <button
+              onClick={onOpenManualTrade}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 font-bold text-[11px] transition-all cursor-pointer shadow-sm shadow-teal-500/20 active:scale-95"
+              title="Buka Posisi Manual"
+            >
+              <Zap className="w-3 h-3 fill-current text-teal-400" />
+              <span>+ TRADE MANUAL</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -139,7 +150,7 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
         <div className="p-2.5 rounded-2xl bg-slate-900/60 border border-teal-500/20">
           <span className="text-[10px] text-slate-400 block mb-0.5">Win Rate</span>
           <div className="text-base sm:text-lg font-black text-cyan-300 tabular-nums">
-            {winRate.toFixed(1)}%
+            {closedTrades.length > 0 ? `${winRate.toFixed(1)}%` : '--%'}
           </div>
         </div>
       </div>
@@ -152,7 +163,7 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
             <span>Active Positions ({activePositions.length}/3 Live)</span>
           </div>
 
-          {/* Real-time Combined Floating PnL - Visible to all users */}
+          {/* Real-time Combined Floating PnL */}
           <div
             className={`font-black tabular-nums flex items-center gap-1 ${
               isPositiveFloating ? 'text-emerald-400' : 'text-rose-400'
@@ -168,7 +179,6 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
         {/* Positions Container */}
         {activePositions.length > 0 ? (
           <div className="rounded-2xl border border-teal-500/25 bg-slate-950/70 p-2.5 space-y-2">
-            {/* Live Positions List - Floating PnL is completely visible; only Entry is sensored for Guests */}
             {activePositions.map((pos) => {
               const isPosProfit = pos.floatingDollar >= 0;
               return (
@@ -200,8 +210,7 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
                         </div>
 
                         {/* SENSORING REQUIREMENT:
-                            Only sensor Entry @ for Guests. No VIP Unlock text next to entry.
-                            Members see exact Entry @ level! */}
+                            Only sensor Entry @ for Guests. Members see exact Entry @ level! */}
                         <div className="text-[10px] font-mono mt-0.5">
                           {isGuest ? (
                             <div className="inline-flex items-center gap-1 text-slate-400">
@@ -219,22 +228,35 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
                       </div>
                     </div>
 
-                    {/* Live Floating PnL - ALWAYS FULLY VISIBLE TO BOTH GUESTS AND MEMBERS */}
-                    <div className="text-right font-mono">
-                      <div
-                        className={`text-xs sm:text-sm font-black tabular-nums ${
-                          isPosProfit ? 'text-emerald-400' : 'text-rose-400'
-                        }`}
-                      >
-                        {isPosProfit ? '+' : '-'}${Math.abs(pos.floatingDollar).toFixed(2)}
+                    {/* Live Floating PnL & Close Position Action */}
+                    <div className="flex items-center gap-2.5">
+                      <div className="text-right font-mono">
+                        <div
+                          className={`text-xs sm:text-sm font-black tabular-nums ${
+                            isPosProfit ? 'text-emerald-400' : 'text-rose-400'
+                          }`}
+                        >
+                          {isPosProfit ? '+' : '-'}${Math.abs(pos.floatingDollar).toFixed(2)}
+                        </div>
+                        <div
+                          className={`text-[10px] font-bold tabular-nums ${
+                            isPosProfit ? 'text-emerald-400/90' : 'text-rose-400/90'
+                          }`}
+                        >
+                          {isPosProfit ? '+' : ''}{pos.roePercent.toFixed(1)}% ROE
+                        </div>
                       </div>
-                      <div
-                        className={`text-[10px] font-bold tabular-nums ${
-                          isPosProfit ? 'text-emerald-400/90' : 'text-rose-400/90'
-                        }`}
-                      >
-                        {isPosProfit ? '+' : ''}{pos.roePercent.toFixed(1)}% ROE
-                      </div>
+
+                      {onClosePosition && (
+                        <button
+                          type="button"
+                          onClick={() => onClosePosition(pos.asset)}
+                          className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-[10px] font-bold transition-all cursor-pointer active:scale-95"
+                          title="Tutup Posisi Sekarang"
+                        >
+                          Close
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -263,14 +285,25 @@ export const OwnerLivePortfolio: React.FC<OwnerLivePortfolioProps> = ({
                 </div>
               );
             })}
-
-
           </div>
         ) : (
-          <div className="p-3 rounded-2xl bg-slate-950/60 border border-teal-500/15 text-center">
+          <div className="p-4 rounded-2xl bg-slate-950/60 border border-teal-500/15 text-center space-y-2.5">
             <div className="text-xs font-mono font-bold text-slate-300">
-              No Active Position · AI Scanning BTC, ETH & XRP 24/7
+              Tidak Ada Posisi Terbuka · Siap Memulai Trading Manual
             </div>
+            <p className="text-[11px] text-slate-400 font-sans max-w-xs mx-auto">
+              Semua sinyal, posisi, dan riwayat telah di-reset bersih. Silakan buka posisi manual sesuai analisa Anda.
+            </p>
+            {onOpenManualTrade && (
+              <button
+                type="button"
+                onClick={onOpenManualTrade}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold font-mono bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 shadow-lg shadow-teal-500/20 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+              >
+                <Zap className="w-3.5 h-3.5 fill-current" />
+                <span>+ Buka Posisi Manual Sekarang</span>
+              </button>
+            )}
           </div>
         )}
       </div>
