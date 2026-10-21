@@ -45,10 +45,10 @@ export const TpProgressCard: React.FC<TpProgressCardProps> = ({
         </div>
         <div className="space-y-1">
           <h3 className="font-extrabold text-sm text-white font-mono tracking-wide">
-            STANDBY · SIAP TRADING MANUAL
+            AI ENGINE STANDBY
           </h3>
           <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
-            Tidak ada posisi terbuka. Gunakan tombol <strong>+ Trade Manual</strong> untuk membuka posisi sesuai analisa Anda.
+            Menunggu konfirmasi sinyal & order flow pasar Binance.
           </p>
         </div>
       </div>

@@ -18,8 +18,6 @@ import { AdminControlModal } from './components/AdminControlModal';
 import { GuestSignalLock } from './components/GuestSignalLock';
 import { VipPaymentModal } from './components/VipPaymentModal';
 import { AnalyticChartsView } from './components/AnalyticChartsView';
-import { ManualTradeModal } from './components/ManualTradeModal';
-import { BotControlBanner } from './components/BotControlBanner';
 import {
   subscribeToClosedTrades,
   saveClosedTradeToCloud,
@@ -33,7 +31,7 @@ import {
 import { generateInstantSignal, checkSignalHit, generateWavePoints } from './utils/signalEngine';
 import { generateLiveJournalEntry } from './utils/aiTradingAgent';
 import { playAlertSound } from './utils/sound';
-import { Bell, BellOff, Crown, UserCheck, KeyRound, Sliders, Sparkles, Zap } from 'lucide-react';
+import { Bell, BellOff, Crown, UserCheck, KeyRound, Sliders, Sparkles } from 'lucide-react';
 
 const DEFAULT_BTC: MarketTicker = {
   symbol: 'BTC/USDT',
@@ -140,11 +138,10 @@ export default function App() {
     return [];
   });
 
-  // BOT AI TRADING CONTROL - Default Paused / False so User Can Do Manual Trading
+  // BOT AI TRADING CONTROL - Default Paused, Managed via Admin Panel
   const [isBotRunning, setIsBotRunning] = useState<boolean>(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
   const [isVipPaymentOpen, setIsVipPaymentOpen] = useState<boolean>(false);
-  const [isManualTradeModalOpen, setIsManualTradeModalOpen] = useState<boolean>(false);
 
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -460,18 +457,22 @@ export default function App() {
           showToast(`🛑 ${asset} HIT SL! (-${Math.abs(roePercent).toFixed(1)}% ROE · -$${Math.abs(gainUsdt).toFixed(2)} USDT)`);
         }
 
-        // If automated bot is not running, position finishes and remains closed (Manual mode!)
+        // If automated bot is paused, position finishes and remains closed
         if (!isBotRunning) {
           const finishedSignals = { ...activeSignalsRef.current, [asset]: null };
           updateAndPersistSignals(finishedSignals);
           return;
         }
 
-        // If bot is active, generate next signal
+        // If bot is active, generate next independent signal
         const ticker =
           asset === 'BTC/USDT' ? btcTickerRef.current : asset === 'ETH/USDT' ? ethTickerRef.current : xrpTickerRef.current;
         const candles = ticker?.candles || [];
-        const freshSignal = generateInstantSignal(asset, '1h', newPrice, candles);
+        const freshSignal = generateInstantSignal(asset, '1h', newPrice, candles, {
+          high24h: ticker?.high24h,
+          low24h: ticker?.low24h,
+          changePercent: ticker?.changePercent,
+        });
         const nextSignals = { ...activeSignalsRef.current, [asset]: freshSignal };
         updateAndPersistSignals(nextSignals);
       }
@@ -541,7 +542,7 @@ export default function App() {
     selectedAsset === 'BTC/USDT' ? btcTicker : selectedAsset === 'ETH/USDT' ? ethTicker : xrpTicker;
   const currentPrice = currentTicker?.price || (selectedAsset === 'BTC/USDT' ? 83040 : selectedAsset === 'ETH/USDT' ? 2540 : 1.38);
 
-  // Bot-only Signal Generation Effect (DISABLED when isBotRunning is false!)
+  // Bot-only Signal Generation Effect (ACTIVE ONLY when Admin toggles isBotRunning to true)
   useEffect(() => {
     if (!isBotRunning) return;
     const currentSigObj = { ...activeSignalsRef.current };
@@ -556,7 +557,11 @@ export default function App() {
       const candles = ticker?.candles || [];
 
       if (!existingSig || existingSig.status !== 'RUNNING') {
-        const sig = generateInstantSignal(asset, '1h', basePrice, candles);
+        const sig = generateInstantSignal(asset, '1h', basePrice, candles, {
+          high24h: ticker?.high24h,
+          low24h: ticker?.low24h,
+          changePercent: ticker?.changePercent,
+        });
         currentSigObj[asset] = sig;
         hasChanges = true;
       }
@@ -567,80 +572,12 @@ export default function App() {
     }
   }, [isBotRunning, updateAndPersistSignals]);
 
-  // MANUAL TRADING ACTIONS
-  const handleOpenManualTrade = (signal: SignalData) => {
-    const updatedSignals = { ...activeSignalsRef.current, [signal.asset]: signal };
-    updateAndPersistSignals(updatedSignals);
-    setSelectedAsset(signal.asset);
-    showToast(`🚀 Posisi ${signal.asset} (${signal.signal}) berhasil dibuka secara manual!`);
-  };
-
-  const handleManualClosePosition = (asset: AssetSymbol) => {
-    const sig = activeSignalsRef.current[asset];
-    if (!sig) return;
-
-    const ticker =
-      asset === 'BTC/USDT' ? btcTickerRef.current : asset === 'ETH/USDT' ? ethTickerRef.current : xrpTickerRef.current;
-    const currentMarketPrice = ticker?.price || sig.entryPrice || 0;
-    const isBuy = sig.signal.includes('BUY');
-    const avgEntry = sig.entryPrice || (sig.entryRange.min + sig.entryRange.max) / 2;
-    const dir = isBuy ? 1 : -1;
-    const priceMovePct = avgEntry > 0 ? ((currentMarketPrice - avgEntry) / avgEntry) * dir : 0;
-    const leverage = 10;
-    const marginUsdt = sig.recommendedMarginUsdt || 150.0;
-    const roePercent = Math.round(priceMovePct * leverage * 100 * 10) / 10;
-    const gainUsdt = Math.round(marginUsdt * (roePercent / 100) * 100) / 100;
-    const pnlPips = Math.round(Math.abs(currentMarketPrice - avgEntry));
-    const isWin = gainUsdt >= 0;
-
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())} UTC`;
-
-    const closedTradeItem: ClosedTrade = {
-      id: `trade-manual-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      dateStr,
-      timeStr,
-      asset,
-      direction: isBuy ? 'BUY' : 'SELL',
-      entryPrice: avgEntry,
-      exitPrice: currentMarketPrice,
-      hitType: isWin ? 'HIT_TP' : 'HIT_SL',
-      leverage,
-      marginUsdt,
-      gainUsdt,
-      roePercent,
-      pnlPercent: roePercent,
-      pnlPips,
-      waveTrajectory: generateWavePoints(avgEntry, currentMarketPrice, isWin ? 'HIT_TP' : 'HIT_SL'),
-      timestamp: Date.now(),
-    };
-
-    setClosedTrades((prev) => {
-      const updated = [closedTradeItem, ...prev];
-      try {
-        localStorage.setItem('aurasignals_closed_trades', JSON.stringify(updated));
-      } catch (e) {}
-      return updated;
-    });
-    saveClosedTradeToCloud(closedTradeItem);
-
-    // Remove from active signals
-    const updatedSignals = { ...activeSignalsRef.current, [asset]: null };
-    updateAndPersistSignals(updatedSignals);
-
-    showToast(
-      `${isWin ? '🎯' : '🛑'} Posisi ${asset} ditutup di harga $${currentMarketPrice.toLocaleString()} (${isWin ? '+' : ''}$${gainUsdt.toFixed(2)} USDT · ${roePercent}%)`
-    );
-  };
-
-  // Bot AI Master Toggle (Manual Start / Pause by User)
+  // Master Bot Toggle (Controlled exclusively via Admin Panel)
   const handleToggleBot = async (running: boolean) => {
     setIsBotRunning(running);
     await setBotControlInCloud(running);
     if (running) {
-      showToast('🤖 Bot AI Trading DIAKTIFKAN! Memulai pemindaian pasar BTC, ETH & XRP...');
+      showToast('🤖 Bot AI Trading AKTIF! Memulai pemindaian pasar BTC, ETH & XRP...');
       const currentSigObj = { ...activeSignalsRef.current };
       let hasChanges = false;
       const assets: AssetSymbol[] = ['BTC/USDT', 'ETH/USDT', 'XRP/USDT'];
@@ -679,7 +616,10 @@ export default function App() {
   };
 
   const handleAddManualSignal = (newSignal: SignalData) => {
-    handleOpenManualTrade(newSignal);
+    const updated = { ...activeSignalsRef.current, [newSignal.asset]: newSignal };
+    updateAndPersistSignals(updated);
+    setSelectedAsset(newSignal.asset);
+    showToast(`Manual signal ${newSignal.asset} (${newSignal.signal}) published.`);
   };
 
   const handleResetAllHistory = () => {
@@ -740,16 +680,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            {/* Quick Manual Trade Button */}
-            <button
-              onClick={() => setIsManualTradeModalOpen(true)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-xl text-[10px] font-mono font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40 hover:bg-teal-500/30 transition-all cursor-pointer shadow-sm shadow-teal-500/20 active:scale-95"
-              title="Buka Posisi Manual"
-            >
-              <Zap className="w-3 h-3 text-teal-400 fill-current" />
-              <span>+ TRADE</span>
-            </button>
-
             {/* VIP Upgrade Button */}
             {userRole === 'GUEST' && (
               <button
@@ -761,7 +691,7 @@ export default function App() {
               </button>
             )}
 
-            {/* Admin Control Panel Button */}
+            {/* Admin Control Panel Button (Visible Only for ADMIN role) */}
             {userRole === 'ADMIN' && (
               <button
                 onClick={() => setIsAdminModalOpen(true)}
@@ -819,13 +749,6 @@ export default function App() {
         {/* TAB 1: Sinyal Live */}
         {activeSection === 'chart' && (
           <div className="space-y-3">
-            {/* Master Bot AI Start/Pause Switch - User controls when to start trading */}
-            <BotControlBanner
-              isBotRunning={isBotRunning}
-              onToggleBot={handleToggleBot}
-              activeCount={Object.values(activeSignals).filter((s) => s && s.status === 'RUNNING').length}
-            />
-
             {/* Asset Header with switcher for BTC, ETH, XRP */}
             <AssetHero
               selectedAsset={selectedAsset}
@@ -882,8 +805,6 @@ export default function App() {
               userRole={userRole}
               onOpenAccessModal={() => setIsAccessModalOpen(true)}
               onOpenVipPayment={() => setIsVipPaymentOpen(true)}
-              onOpenManualTrade={() => setIsManualTradeModalOpen(true)}
-              onClosePosition={handleManualClosePosition}
             />
           </div>
         )}
@@ -921,15 +842,6 @@ export default function App() {
       <BottomNavBar
         activeSection={activeSection}
         onSelectSection={(sec) => setActiveSection(sec)}
-      />
-
-      {/* Manual Trade Modal */}
-      <ManualTradeModal
-        isOpen={isManualTradeModalOpen}
-        onClose={() => setIsManualTradeModalOpen(false)}
-        currentPrices={{ btc: btcTicker.price, eth: ethTicker.price, xrp: xrpTicker.price }}
-        activeSignals={activeSignals}
-        onOpenTrade={handleOpenManualTrade}
       />
 
       {/* 6-Digit PIN Modal */}
